@@ -39,6 +39,22 @@ class MeowPack_Importer {
 			return new WP_REST_Response( $this->import_from_api( $offset ), 200 );
 		}
 
+		if ( 'api_preview' === $source ) {
+			$data = array();
+			switch ( $offset ) {
+				case 0:
+					$data = $this->fetch_jetpack_api( 'stats/visits', array( 'unit' => 'day', 'quantity' => 30 ) );
+					break;
+				case 1:
+					$data = $this->fetch_jetpack_api( 'stats/post-views', array( 'date' => 'all', 'max' => 100 ) );
+					break;
+				case 2:
+					$data = $this->fetch_jetpack_api( 'stats/referrers', array( 'date' => 'all', 'max' => 50 ) );
+					break;
+			}
+			return new WP_REST_Response( array( 'success' => true, 'preview' => wp_json_encode( $data, JSON_PRETTY_PRINT ) ), 200 );
+		}
+
 		if ( 'csv' !== $source ) {
 			return new WP_REST_Response( array( 'error' => 'Sumber migrasi tidak didukung. Silakan gunakan impor CSV atau Direct API.' ), 400 );
 		}

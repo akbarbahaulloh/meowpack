@@ -243,16 +243,24 @@ $s = function( $key, $default = '' ) {
 				if ( $jp_active ) : 
 				?>
 					<div style="color:#22c55e; font-weight:600; margin-bottom:10px;">✅ <?php esc_html_e( 'Koneksi Jetpack Aktif!', 'meowpack' ); ?></div>
-					<p class="description" style="margin-bottom:15px; font-size:12px;">Menyedot data 30 hari ke belakang dan menyatukan riwayat *"All-Time"* (Artikel/Referrer).</p>
-					<button type="button" id="meowpack-import-api" class="button button-primary">
-						<?php esc_html_e( '🚀 Mulai Scraping API', 'meowpack' ); ?>
-					</button>
+					<p class="description" style="margin-bottom:15px; font-size:12px;">Mode Pratinjau: Cek Data Mentah sebelum menyimpannya.</p>
+
+					<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+						<button type="button" class="button btn-api-preview" data-step="0"><?php esc_html_e( '👁️ P1. Kunjungan Harian', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="1"><?php esc_html_e( '👁️ P2. Artikel Terpopuler', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="2"><?php esc_html_e( '👁️ P3. Sumber Referrer', 'meowpack' ); ?></button>
+					</div>
+
+					<div id="meowpack-api-preview-box" style="display:none; margin-bottom:15px;">
+						<pre id="meowpack-api-preview-content" style="background:#1e293b; color:#e2e8f0; padding:15px; border-radius:6px; max-height:250px; overflow-y:auto; font-size:11px;"></pre>
+						<button type="button" id="meowpack-import-api-confirm" class="button button-primary" style="margin-top:10px;">
+							<?php esc_html_e( '💾 Konfirmasi & Impor Data Ini', 'meowpack' ); ?>
+						</button>
+					</div>
+					
 				<?php else : ?>
 					<div style="color:#ef4444; margin-bottom:10px;">❌ <?php esc_html_e( 'Koneksi Jetpack Terputus.', 'meowpack' ); ?></div>
 					<p class="description" style="font-size:12px;"><?php esc_html_e( 'Plugin Jetpack harus aktif untuk dapat meretas jalur API-nya. Gunakan Impor CSV jika Anda sudah menghapus Jetpack.', 'meowpack' ); ?></p>
-					<button type="button" class="button button-primary" disabled>
-						<?php esc_html_e( '🚀 Mulai Scraping API', 'meowpack' ); ?>
-					</button>
 				<?php endif; ?>
 			</div>
 
@@ -285,7 +293,10 @@ $s = function( $key, $default = '' ) {
 		const csvFileEl = $('#meowpack-csv-file');
 		const csvNameEl = $('#meowpack-csv-filename');
 		const csvBtnEl  = $('#meowpack-import-csv');
-		const apiBtnEl  = $('#meowpack-import-api');
+		const prevBtns  = $('.btn-api-preview');
+		const confirmBtn= $('#meowpack-import-api-confirm');
+		const prevBox   = $('#meowpack-api-preview-box');
+		const prevCont  = $('#meowpack-api-preview-content');
 		const statusEl  = $('#meowpack-import-status');
 		const logEl     = $('#import-log');
 		const msgEl     = $('#import-msg');
@@ -334,7 +345,7 @@ $s = function( $key, $default = '' ) {
 						barEl.css('width', '100%');
 						msgEl.html(`<span style="color:#22c55e;">✅ Migrasi Selesai! Total ${total_imported} data berhasil diimpor/diupdate.</span>`);
 						csvBtnEl.prop('disabled', false).text('📤 Proses CSV');
-						if (apiBtnEl.length) apiBtnEl.prop('disabled', false).text('🚀 Mulai Scraping API');
+						if (confirmBtn.length) confirmBtn.prop('disabled', false).text('💾 Konfirmasi & Impor Data Ini');
 					} else {
 						let pct = Math.min(95, Math.round((res.offset) / (res.offset + 1000) * 100)); 
 						barEl.css('width', pct + '%');
@@ -358,11 +369,62 @@ $s = function( $key, $default = '' ) {
 			runImport('csv', 0, 0);
 		});
 
-		if (apiBtnEl.length) {
-			apiBtnEl.on('click', function() {
-				$(this).prop('disabled', true).text('⏳ Menghubungi API...');
+		if (prevBtns.length) {
+			let currentPreviewStep = 0;
+
+			prevBtns.on('click', function() {
+				const btn = $(this);
+				currentPreviewStep = btn.data('step');
+				
+				prevBtns.prop('disabled', true);
+				btn.text('⏳ Mengambil Data...');
+				prevBox.hide();
+				
+				$.ajax({
+					url: meowpackAdmin.apiBase + 'import',
+					type: 'POST',
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader('X-WP-Nonce', meowpackAdmin.nonce);
+					},
+					data: { source: 'api_preview', offset: currentPreviewStep },
+					success: function(res) {
+						if (res.preview) {
+							prevCont.text(res.preview);
+							prevBox.fadeIn();
+						}
+						btn.text('👁️ P' + (currentPreviewStep + 1) + ' Selesai');
+						prevBtns.prop('disabled', false);
+					},
+					error: function() {
+						alert('Gagal mengambil data pratinjau API.');
+						prevBtns.prop('disabled', false);
+					}
+				});
+			});
+
+			confirmBtn.on('click', function() {
+				$(this).prop('disabled', true).text('⏳ Menyimpan ke DB...');
 				logEl.empty();
-				runImport('api', 0, 0);
+				statusEl.fadeIn();
+				
+				// Run import for ONLY this specific step instead of loop
+				$.ajax({
+					url: meowpackAdmin.apiBase + 'import',
+					type: 'POST',
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader('X-WP-Nonce', meowpackAdmin.nonce);
+					},
+					data: { source: 'api', offset: currentPreviewStep },
+					success: function(res) {
+						confirmBtn.text('✅ Tersimpan!');
+						let time = new Date().toLocaleTimeString();
+						logEl.prepend(`<li>[${time}] ${res.message} (+${res.imported} baris)</li>`);
+					},
+					error: function() {
+						confirmBtn.text('❌ Gagal Menyimpan');
+						confirmBtn.prop('disabled', false);
+					}
+				});
 			});
 		}
 	});
