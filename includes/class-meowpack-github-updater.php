@@ -57,6 +57,11 @@ class MeowPack_GitHub_Updater {
 
 		// Hook to save the newly installed SHA after a successful update.
 		add_action( 'upgrader_process_complete', array( $this, 'update_installed_sha' ), 10, 2 );
+
+		// Manual check link in plugins list.
+		add_filter( 'plugin_action_links_' . $this->basename, array( $this, 'add_manual_check_link' ) );
+		add_action( 'admin_init', array( $this, 'handle_manual_check' ) );
+		add_action( 'admin_notices', array( $this, 'display_update_notice' ) );
 	}
 
 	/**
@@ -230,6 +235,46 @@ class MeowPack_GitHub_Updater {
 					update_option( 'meowpack_installed_sha', sanitize_text_field( $latest->sha ) );
 				}
 			}
+		}
+	}
+
+	/**
+	 * Add "Check for Update" link to plugin action links.
+	 */
+	public function add_manual_check_link( $links ) {
+		$check_link = array(
+			'<a href="' . esc_url( admin_url( 'plugins.php?meowpack_check_update=1' ) ) . '">' . __( 'Cek Pembaruan', 'meowpack' ) . '</a>',
+		);
+		return array_merge( $check_link, $links );
+	}
+
+	/**
+	 * Handle manual update check from URL.
+	 */
+	public function handle_manual_check() {
+		if ( ! is_admin() || ! isset( $_GET['meowpack_check_update'] ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		// Clear the cache.
+		delete_site_transient( 'meowpack_gh_commit_data' );
+		delete_site_transient( 'update_plugins' ); // Force WP to re-check all plugins.
+
+		// Redirect back with a notice flag.
+		wp_safe_redirect( admin_url( 'plugins.php?meowpack_update_checked=1' ) );
+		exit;
+	}
+
+	/**
+	 * Display a notice after checking for updates manually.
+	 */
+	public function display_update_notice() {
+		if ( isset( $_GET['meowpack_update_checked'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'MeowPack berhasil memeriksa pembaruan di GitHub. Jika ada versi baru, tombol "Update Now" akan muncul di bawah deskripsi plugin.', 'meowpack' ) . '</p></div>';
 		}
 	}
 }

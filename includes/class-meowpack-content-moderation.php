@@ -110,6 +110,10 @@ class MeowPack_Content_Moderation {
 			$keyword    = mb_strtolower( $rule['keyword'] );
 			$match_mode = $rule['match_mode'] ?? 'substring';
 
+			if ( 'smart' === $match_mode ) {
+				$match_mode = $this->get_smart_match_mode( $keyword );
+			}
+
 			$found = false;
 			if ( 'word' === $match_mode ) {
 				// Whole-word match using word boundary (Unicode-aware).
@@ -172,6 +176,24 @@ class MeowPack_Content_Moderation {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Determine the best match mode for a keyword automatically.
+	 *
+	 * @param string $keyword The keyword/signature.
+	 * @return string 'word' or 'substring'.
+	 */
+	private function get_smart_match_mode( $keyword ) {
+		// If it looks like code, contains special chars, or contains spaces -> substring.
+		if ( preg_match( '/[^a-zA-Z0-9\s]/', $keyword ) || strpos( $keyword, ' ' ) !== false ) {
+			return 'substring';
+		}
+		// Short alphanumeric words get word boundaries to avoid false positives.
+		if ( strlen( $keyword ) <= 12 ) {
+			return 'word';
+		}
+		return 'substring';
 	}
 
 	/**
@@ -733,6 +755,55 @@ class MeowPack_Content_Moderation {
 		}
 
 		wp_send_json_success( $result );
+	}
+
+	/**
+	 * AJAX Handler: Sync keywords and domains from GitHub.
+	 */
+	public function ajax_sync_cloud() {
+		check_ajax_referer( 'meowpack_sync_cloud', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Permission denied' );
+		}
+
+		$stats = array( 'keywords' => 0, 'domains' => 0, 'errors' => array() );
+
+		// 1. Sync Keywords (dictionary.json - simple string array)
+		$kw_url = 'https://raw.githubusercontent.com/akbarbahaulloh/meowpack/main/dictionary.json';
+		$kw_res = wp_remote_get( $kw_url, array( 'timeout' => 15 ) );
+
+		if ( ! is_wp_error( $kw_res ) && wp_remote_retrieve_response_code( $kw_res ) === 200 ) {
+			$data = json_decode( wp_remote_retrieve_body( $kw_res ), true );
+			if ( is_array( $data ) ) {
+				foreach ( $data as $keyword ) {
+					if ( is_string( $keyword ) ) {
+						// Simple string format -> use Smart match mode.
+						$ok = self::add_rule( trim( $keyword ), 'cloud', 'hold', 'smart' );
+						if ( $ok ) $stats['keywords']++;
+					}
+				}
+			}
+		} else {
+			$stats['errors'][] = 'Gagal mengambil dictionary.json';
+		}
+
+		// 2. Sync Domains (domains.json - simple string array)
+		$dom_url = 'https://raw.githubusercontent.com/akbarbahaulloh/meowpack/main/domains.json';
+		$dom_res = wp_remote_get( $dom_url, array( 'timeout' => 15 ) );
+
+		if ( ! is_wp_error( $dom_res ) && wp_remote_retrieve_response_code( $dom_res ) === 200 ) {
+			$data = json_decode( wp_remote_retrieve_body( $dom_res ), true );
+			if ( is_array( $data ) ) {
+				update_option( 'meowpack_domain_blacklist', $data );
+				$stats['domains'] = count( $data );
+			}
+		} else {
+			$stats['errors'][] = 'Gagal mengambil domains.json';
+		}
+
+		self::flush_cache();
+
+		wp_send_json_success( $stats );
 	}
 
 	/**

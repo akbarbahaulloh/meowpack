@@ -2,8 +2,8 @@
 /**
  * Plugin Name: MeowPack
  * Plugin URI:  https://github.com/akbarbahaulloh/meowpack
- * Description: Plugin WordPress ringan pengganti Jetpack. Statistik, auto-share sosmed, view counter — semua data tersimpan lokal, tanpa ketergantungan pihak ketiga.
- * Version:     1.0.0
+ * Description: The ultimate security and optimization powerhouse for WordPress. Real-time local stats, AI-powered protection, malware scanning, and instant social engine — privacy-first, zero cloud dependencies, 100% control.
+ * Version:     2.2.0
  * Author:      Akbar Bahaulloh
  * Author URI:  https://akbarbahaulloh.id
  * License:     GPL-2.0-or-later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'MEOWPACK_VERSION', '1.0.0' );
+define( 'MEOWPACK_VERSION', '2.2.0' );
 define( 'MEOWPACK_FILE', __FILE__ );
 define( 'MEOWPACK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MEOWPACK_URL', plugin_dir_url( __FILE__ ) );
