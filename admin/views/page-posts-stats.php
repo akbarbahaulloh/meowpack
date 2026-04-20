@@ -16,6 +16,7 @@ $period_options = array(
 	'today'      => __( 'Hari Ini', 'meowpack' ),
 	'this_week'  => __( 'Minggu Ini', 'meowpack' ),
 	'this_month' => __( 'Bulan Ini', 'meowpack' ),
+	'this_year'  => __( 'Tahun Ini', 'meowpack' ),
 	'alltime'    => __( 'Semua Waktu', 'meowpack' ),
 );
 

@@ -346,17 +346,28 @@ class MeowPack_Stats {
 				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
 				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
 				break;
+			case 'this_year':
+				$start       = current_time( 'Y' ) . '-01-01';
+				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
+				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
+				break;
 			default: // alltime.
 				$where_agg   = '1=1';
 				$where_today = '1=1';
 		}
 
-		// Fetch raw views from today/current range (real-time)
+		// Smart-Merge: Avoid double counting based on last aggregation date.
+		$last_agg_date = $wpdb->get_var( "SELECT MAX(stat_date) FROM {$stats_table}" ) ?: '0000-00-00';
+
+		// Fetch raw views from today/current range (real-time - only for days NOT aggregated)
 		$raw_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			"SELECT post_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS uv 
-			 FROM {$visits_table} 
-			 WHERE is_bot = 0 AND post_id > 0 AND {$where_today} 
-			 GROUP BY post_id",
+			$wpdb->prepare(
+				"SELECT post_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS uv 
+				 FROM {$visits_table} 
+				 WHERE is_bot = 0 AND post_id > 0 AND {$where_today} AND visit_date > %s
+				 GROUP BY post_id",
+				$last_agg_date
+			),
 			ARRAY_A
 		);
 
@@ -729,9 +740,9 @@ class MeowPack_Stats {
 		}
 
 		$results = $wpdb->get_results(
-			"SELECT post_author AS author_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(DISTINCT post_id) AS post_count
-			 FROM {$visits_table} WHERE is_bot = 0 AND {$w_raw} AND post_author > 0
-			 GROUP BY post_author ORDER BY views DESC LIMIT 20",
+			"SELECT author_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(DISTINCT post_id) AS post_count
+			 FROM {$visits_table} WHERE is_bot = 0 AND {$w_raw} AND author_id > 0
+			 GROUP BY author_id ORDER BY views DESC LIMIT 20",
 			ARRAY_A
 		);
 
@@ -782,5 +793,35 @@ class MeowPack_Stats {
 		}
 
 		return new WP_REST_Response( $data, 200 );
+	}
+
+	/**
+	 * Get top post for a specific author.
+	 */
+	public function get_top_post_for_author( $author_id, $period = 'today' ) {
+		global $wpdb;
+		$visits_table = $wpdb->prefix . 'meow_visits';
+
+		$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+		$month_start = current_time( 'Y-m' ) . '-01';
+		$year_start  = current_time( 'Y' ) . '-01-01';
+
+		switch ( $period ) {
+			case 'today':      $w_raw = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) ); break;
+			case 'this_week':  $w_raw = $wpdb->prepare( 'visit_date >= %s', $monday ); break;
+			case 'this_month': $w_raw = $wpdb->prepare( 'visit_date >= %s', $month_start ); break;
+			case 'this_year':  $w_raw = $wpdb->prepare( 'visit_date >= %s', $year_start ); break;
+			default:           $w_raw = '1=1';
+		}
+
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT post_id, COUNT(*) AS views
+				 FROM {$visits_table} WHERE is_bot = 0 AND author_id = %d AND {$w_raw}
+				 GROUP BY post_id ORDER BY views DESC LIMIT 1",
+				$author_id
+			),
+			ARRAY_A
+		);
 	}
 }
