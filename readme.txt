@@ -8,11 +8,11 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Plugin WordPress ringan pengganti Jetpack. Statistik pengunjung, auto-share sosial media, view counter — semua data tersimpan lokal.
+MeowPack — Powerhouse optimasi dan keamanan WordPress. Statistik lokal, auto-share ke 9 platform, view counter, dan AI bot manager dalam satu plugin ringan.
 
 == Description ==
 
-**MeowPack** adalah plugin WordPress ringan yang menggantikan Jetpack dengan menyimpan semua data di database lokal (MySQL WordPress) tanpa ketergantungan API pihak ketiga untuk statistik.
+**MeowPack** adalah plugin WordPress "all-in-one" yang mengutamakan privasi dan performa. Kelola statistik, keamanan, dan distribusi konten ke media sosial secara instan tanpa ketergantungan API pihak ketiga.
 
 = Fitur Utama =
 
@@ -57,7 +57,7 @@ IP address di-hash menggunakan SHA-256 + WordPress salt, sehingga tidak bisa di-
 
 = Bisakah saya import data dari Jetpack? =
 
-Ya. Buka **MeowPack → Import Jetpack**. Plugin akan mendeteksi data Jetpack secara otomatis, atau Anda bisa upload file CSV dari ekspor WordPress.com.
+Ya. Buka **MeowPack → Pengaturan → Migrasi**. Plugin akan mendeteksi data Jetpack secara otomatis, atau Anda bisa upload file CSV dari ekspor WordPress.com.
 
 = Platform sosial media apa yang didukung? =
 

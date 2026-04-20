@@ -154,9 +154,8 @@ class MeowPack_ShareButtons {
 			$style = MeowPack_Database::get_setting( 'share_button_style', 'icon-text' );
 		}
 
-		$url           = rawurlencode( get_permalink( $post ) );
-		$title         = rawurlencode( get_the_title( $post ) );
-		$excerpt       = rawurlencode( get_the_excerpt( $post ) );
+		$url   = rawurlencode( get_permalink( $post ) );
+		$title = rawurlencode( get_the_title( $post ) );
 		$platforms_raw = MeowPack_Database::get_setting( 'share_platforms', 'facebook,twitter,telegram,whatsapp' );
 		$active        = array_map( 'trim', explode( ',', $platforms_raw ) );
 
