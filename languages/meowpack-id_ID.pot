@@ -1,0 +1,12 @@
+/* meowpack-id_ID.pot — WordPress plugin translation template */
+msgid ""
+msgstr ""
+"Project-Id-Version: MeowPack 1.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/akbarbahaulloh/meowpack\n"
+"Last-Translator: Akbar Bahaulloh <akbar@example.com>\n"
+"Language-Team: Indonesian\n"
+"Language: id_ID\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: MakeWPPOT\n"
+"X-Domain: meowpack\n"
