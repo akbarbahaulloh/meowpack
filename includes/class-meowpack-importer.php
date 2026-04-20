@@ -59,7 +59,17 @@ class MeowPack_Importer {
 	public function has_jetpack_data() {
 		global $wpdb;
 
-		// Check for Jetpack stats tables (most reliable even if inactive).
+		// 1. Check if Jetpack plugin is active
+		if ( class_exists( 'Jetpack' ) ) {
+			return true;
+		}
+
+		// 2. Check for Jetpack options containing stats cache
+		if ( get_option( 'stats_cache' ) || get_option( 'jetpack_post_stats' ) || get_option( 'jetpack_options' ) ) {
+			return true;
+		}
+
+		// 3. Check for Jetpack stats tables (fallback for older versions or multisite)
 		$jetpack_tables = array(
 			$wpdb->prefix . 'jetpack_post_views',
 			$wpdb->prefix . 'jetpack_sites',
