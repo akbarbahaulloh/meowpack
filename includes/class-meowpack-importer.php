@@ -52,26 +52,28 @@ class MeowPack_Importer {
 	}
 
 	/**
-	 * Check if Jetpack stat data exists.
+	 * Check if Jetpack stat data exists (even if plugin is inactive).
 	 *
 	 * @return bool
 	 */
 	public function has_jetpack_data() {
 		global $wpdb;
 
-		// Check Jetpack option.
-		$jetpack_active = get_option( 'jetpack_options' );
-		if ( $jetpack_active ) {
-			return true;
-		}
-
-		// Check for Jetpack stats table.
-		$table = $wpdb->prefix . 'jetpack_sites';
-		$exists = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->prepare( "SHOW TABLES LIKE %s", $table )
+		// Check for Jetpack stats tables (most reliable even if inactive).
+		$jetpack_tables = array(
+			$wpdb->prefix . 'jetpack_post_views',
+			$wpdb->prefix . 'jetpack_sites',
+			$wpdb->base_prefix . 'stats_post_views',
 		);
 
-		return ! empty( $exists );
+		foreach ( $jetpack_tables as $table ) {
+			$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			if ( $exists ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -174,97 +176,114 @@ class MeowPack_Importer {
 
 	/**
 	 * Import from a WordPress.com CSV export file.
-	 *
-	 * Expected CSV format: date, post_id (or 0 for sitewide), views
+	 * Enhanced to auto-detect columns and handle flexible date formats.
 	 *
 	 * @param string $file_path Absolute path to CSV file.
-	 * @param int    $offset    Line offset (skip header).
+	 * @param int    $offset    Line offset (skipped after header).
 	 * @param int    $limit     Rows per batch.
-	 * @return array{ imported: int, skipped: int, done: bool }
+	 * @return array
 	 */
 	public function import_from_csv( $file_path, $offset = 0, $limit = 200 ) {
 		$imported = 0;
 		$skipped  = 0;
 
 		if ( ! file_exists( $file_path ) ) {
-			return array( 'error' => 'File not found', 'imported' => 0, 'skipped' => 0, 'done' => true );
+			return array( 'success' => false, 'error' => 'File tidak ditemukan.' );
 		}
 
 		$handle = fopen( $file_path, 'r' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
 		if ( ! $handle ) {
-			return array( 'error' => 'Cannot open file', 'imported' => 0, 'skipped' => 0, 'done' => true );
+			return array( 'success' => false, 'error' => 'Gagal membuka file CSV.' );
 		}
 
-		$line_num = 0;
-		$read     = 0;
+		// 1. Read header to map columns.
+		$header = fgetcsv( $handle );
+		if ( ! $header ) {
+			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+			return array( 'success' => false, 'error' => 'File CSV kosong atau tidak valid.' );
+		}
 
-		while ( ( $row = fgetcsv( $handle ) ) !== false ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition
-			$line_num++;
+		$map = array(
+			'date'     => -1,
+			'views'    => -1,
+			'visitors' => -1,
+			'post_id'  => -1,
+		);
 
-			// Skip header row.
-			if ( 1 === $line_num ) {
-				continue;
-			}
+		foreach ( $header as $idx => $col ) {
+			$col = strtolower( trim( $col ) );
+			// Jetpack common headers: Date, Views, Visitors, Post ID, Article ID
+			if ( strpos( $col, 'date' ) !== false )      $map['date']     = $idx;
+			if ( strpos( $col, 'view' ) !== false )      $map['views']    = $idx;
+			if ( strpos( $col, 'visit' ) !== false )     $map['visitors'] = $idx;
+			if ( strpos( $col, 'post id' ) !== false )   $map['post_id']  = $idx;
+			if ( strpos( $col, 'article id' ) !== false )$map['post_id']  = $idx;
+		}
 
-			// Skip rows before offset.
-			if ( $line_num <= $offset + 1 ) {
-				continue;
-			}
+		// Fallback for simple date,views format if no headers match.
+		if ( $map['date'] === -1 && count( $header ) >= 2 ) {
+			$map['date']  = 0;
+			$map['views'] = 1;
+		}
 
-			if ( $read >= $limit ) {
-				break;
-			}
+		if ( $map['date'] === -1 || $map['views'] === -1 ) {
+			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+			return array( 'success' => false, 'error' => 'Kolom "Date" atau "Views" tidak ditemukan di CSV.' );
+		}
 
-			if ( count( $row ) < 2 ) {
-				$skipped++;
-				$read++;
-				continue;
-			}
+		// 2. Skip to offset.
+		for ( $i = 0; $i < $offset; $i++ ) {
+			fgetcsv( $handle );
+		}
 
-			// Support formats: date,views or date,post_id,views.
-			if ( count( $row ) >= 3 ) {
-				$date    = sanitize_text_field( trim( $row[0] ) );
-				$post_id = absint( trim( $row[1] ) );
-				$views   = absint( trim( $row[2] ) );
-			} else {
-				$date    = sanitize_text_field( trim( $row[0] ) );
-				$post_id = 0;
-				$views   = absint( trim( $row[1] ) );
-			}
-
-			// Validate date.
-			if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
-				$skipped++;
-				$read++;
-				continue;
-			}
-
-			$result = $this->upsert_daily_stat( $date, $post_id, $views );
-			$result ? $imported++ : $skipped++;
+		// 3. Process batch.
+		$read = 0;
+		while ( $read < $limit && ( $row = fgetcsv( $handle ) ) !== false ) {
 			$read++;
+
+			$date_raw = $row[ $map['date'] ] ?? '';
+			$views    = absint( $row[ $map['views'] ] ?? 0 );
+			$post_id  = $map['post_id'] !== -1 ? absint( $row[ $map['post_id'] ] ?? 0 ) : 0;
+			$visitors = $map['visitors'] !== -1 ? absint( $row[ $map['visitors'] ] ?? 0 ) : 0;
+
+			if ( empty( $date_raw ) || $views <= 0 ) {
+				$skipped++;
+				continue;
+			}
+
+			// Flexible date parsing.
+			$timestamp = strtotime( $date_raw );
+			if ( ! $timestamp ) {
+				$skipped++;
+				continue;
+			}
+			$date = date( 'Y-m-d', $timestamp );
+
+			$result = $this->upsert_daily_stat( $date, $post_id, $views, $visitors );
+			$result ? $imported++ : $skipped++;
 		}
 
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
-		$done = $read < $limit;
-
 		return array(
+			'success'  => true,
 			'imported' => $imported,
 			'skipped'  => $skipped,
 			'offset'   => $offset + $read,
-			'done'     => $done,
+			'done'     => $read < $limit,
 		);
 	}
 
 	/**
 	 * Upsert a row in meow_daily_stats without duplicating.
 	 *
-	 * @param string $date    Y-m-d date string.
-	 * @param int    $post_id Post ID (0 = sitewide).
-	 * @param int    $views   View count.
+	 * @param string $date     Y-m-d date string.
+	 * @param int    $post_id  Post ID (0 = sitewide).
+	 * @param int    $views    View count.
+	 * @param int    $visitors Unique visitor count (0 = estimate 75% of views).
 	 * @return bool True if inserted/updated, false if skipped.
 	 */
-	private function upsert_daily_stat( $date, $post_id, $views ) {
+	public function upsert_daily_stat( $date, $post_id, $views, $visitors = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'meow_daily_stats';
 
@@ -272,28 +291,35 @@ class MeowPack_Importer {
 			return false;
 		}
 
+		if ( $visitors <= 0 ) {
+			$visitors = (int) round( $views * 0.75 );
+		}
+
 		// Check existence.
 		$existing = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
-				"SELECT id, total_views FROM {$table} WHERE stat_date = %s AND post_id = %d",
+				"SELECT id, total_views, unique_visitors FROM {$table} WHERE stat_date = %s AND post_id = %d",
 				$date, $post_id
 			),
 			ARRAY_A
 		);
 
 		if ( $existing ) {
-			// Only update if imported value is higher (don't overwrite real data).
-			if ( (int) $existing['total_views'] < $views ) {
+			$data = array();
+			if ( (int) $existing['total_views'] < $views )       $data['total_views'] = $views;
+			if ( (int) $existing['unique_visitors'] < $visitors ) $data['unique_visitors'] = $visitors;
+
+			if ( ! empty( $data ) ) {
 				$wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 					$table,
-					array( 'total_views' => $views ),
+					$data,
 					array( 'id' => (int) $existing['id'] ),
 					array( '%d' ),
 					array( '%d' )
 				);
 				return true;
 			}
-			return false; // Skip — already have better data.
+			return false;
 		}
 
 		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -302,7 +328,7 @@ class MeowPack_Importer {
 				'stat_date'       => $date,
 				'post_id'         => $post_id,
 				'total_views'     => $views,
-				'unique_visitors' => (int) round( $views * 0.75 ), // Jetpack doesn't separate UV.
+				'unique_visitors' => $visitors,
 				'source_direct'   => $views,
 			),
 			array( '%s', '%d', '%d', '%d', '%d' )

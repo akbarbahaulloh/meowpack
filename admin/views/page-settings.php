@@ -46,7 +46,6 @@ $s = function( $key, $default = '' ) {
 					<td><label><input type="checkbox" name="enable_autoshare" value="1" <?php checked( '1', $s( 'enable_autoshare', '0' ) ); ?>> <?php esc_html_e( 'Share otomatis saat post dipublish', 'meowpack' ); ?></label></td>
 				</tr>
 			</table>
-			</table>
 		</div>
 
 		<!-- Frontend Enhancements -->
@@ -225,4 +224,171 @@ $s = function( $key, $default = '' ) {
 			</button>
 		</p>
 	</form>
-</div>
+
+	<hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
+
+	<!-- Data Migration section (Relocated from sidebar) -->
+	<div class="meowpack-settings-section" id="meowpack-migration">
+		<h2><?php esc_html_e( '📦 Migrasi Data', 'meowpack' ); ?></h2>
+		<p class="description">
+			<?php esc_html_e( 'Pindahkan statistik Anda dari Jetpack atau import dari file CSV ekspor WordPress.com.', 'meowpack' ); ?>
+		</p>
+
+		<div class="meowpack-row" style="display:flex; gap:20px; margin-top:20px;">
+			<!-- Jetpack Block -->
+			<div style="flex:1; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
+				<h3>🔌 <?php esc_html_e( 'Auto-Detect Jetpack', 'meowpack' ); ?></h3>
+				<?php 
+				$importer = MeowPack_Core::get_instance()->importer;
+				if ( $importer->has_jetpack_data() ) : 
+				?>
+					<div style="color:#22c55e; font-weight:600; margin-bottom:10px;">✅ <?php esc_html_e( 'Data Jetpack ditemukan!', 'meowpack' ); ?></div>
+					<button type="button" id="meowpack-import-jetpack" class="button button-primary">
+						<?php esc_html_e( '🚀 Mulai Import Sekarang', 'meowpack' ); ?>
+					</button>
+				<?php else : ?>
+					<div style="color:#64748b; margin-bottom:10px;">⚪ <?php esc_html_e( 'Tidak ada data Jetpack yang terdeteksi.', 'meowpack' ); ?></div>
+					<p class="description"><?php esc_html_e( 'MeowPack akan mencari tabel Jetpack lama (walaupun plugin sudah dihapus).', 'meowpack' ); ?></p>
+				<?php endif; ?>
+			</div>
+
+			<!-- CSV Block -->
+			<div style="flex:1; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
+				<h3>📄 <?php esc_html_e( 'Import via CSV', 'meowpack' ); ?></h3>
+				<p class="description"><?php esc_html_e( 'Sistem otomatis mendeteksi kolom Date, Views, Visitors, dan Post ID.', 'meowpack' ); ?></p>
+				<input type="file" id="meowpack-csv-file" accept=".csv" style="display:none;">
+				<button type="button" class="button" onclick="document.getElementById('meowpack-csv-file').click()"><?php esc_html_e( '📂 Pilih File CSV', 'meowpack' ); ?></button>
+				<span id="meowpack-csv-filename" style="margin-left:8px; font-size:12px; color:#64748b;"></span>
+				<br><br>
+				<button type="button" id="meowpack-import-csv" class="button button-secondary" disabled>
+					<?php esc_html_e( '📤 Proses CSV', 'meowpack' ); ?>
+				</button>
+			</div>
+		</div>
+
+		<!-- Progress / Logs -->
+		<div id="meowpack-import-status" style="display:none; margin-top:30px; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
+			<div style="font-weight:600; margin-bottom:10px;" id="import-msg"></div>
+			<div style="height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+				<div id="import-progress-bar" style="width:0; height:100%; background:#3b82f6; transition: width 0.3s ease;"></div>
+			</div>
+			<ul id="import-log" style="max-height:150px; overflow-y:auto; font-family:monospace; font-size:12px; margin-top:20px; color:#475569; border-top:1px solid #eee; padding-top:10px;"></ul>
+		</div>
+	</div>
+
+	<script>
+	jQuery(document).ready(function($) {
+		const csvFileEl = $('#meowpack-csv-file');
+		const csvNameEl = $('#meowpack-csv-filename');
+		const csvBtnEl  = $('#meowpack-import-csv');
+		const jpBtnEl   = $('#meowpack-import-jetpack');
+		const statusEl  = $('#meowpack-import-status');
+		const logEl     = $('#import-log');
+		const msgEl     = $('#import-msg');
+		const barEl     = $('#import-progress-bar');
+
+		csvFileEl.on('change', function() {
+			if (this.files.length) {
+				csvNameEl.text(this.files[0].name);
+				csvBtnEl.prop('disabled', false);
+			}
+		});
+
+		function runImport(source, offset, total_imported, fileContent) {
+			statusEl.fadeIn();
+			msgEl.text(`Memproses... (Offset: ${offset})`);
+
+			$.ajax({
+				url: meowpackAdmin.apiBase + 'import',
+				method: 'POST',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', meowpackAdmin.nonce);
+				},
+				contentType: 'application/json',
+				data: JSON.stringify({ source, offset, file: fileContent || '' }),
+				success: function(res) {
+					if (res.error) {
+						msgEl.html('<span style="color:#ef4444;">❌ Error: ' + res.error + '</span>');
+						return;
+					}
+
+					let imported = res.imported || 0;
+					total_imported += imported;
+					logEl.prepend(`<li>Batch Selesai: +${imported} baris (${res.skipped} dilewati)</li>`);
+					
+					if (res.done || res.success === false) {
+						barEl.css('width', '100%');
+						msgEl.html(`<span style="color:#22c55e;">✅ Migrasi Selesai! Total ${total_imported} data berhasil diimpor.</span>`);
+						csvBtnEl.prop('disabled', false).text('📤 Proses CSV');
+						jpBtnEl.prop('disabled', false).text('🚀 Mulai Import Sekarang');
+					} else {
+						let pct = Math.min(95, Math.round((res.offset) / (res.offset + 1000) * 100)); 
+						barEl.css('width', pct + '%');
+						runImport(source, res.offset, total_imported, fileContent);
+					}
+				},
+				error: function(xhr) {
+					msgEl.html('<span style="color:#ef4444;">❌ Server Error. Silakan hubungi admin.</span>');
+				}
+			});
+		}
+
+		jpBtnEl.on('click', function() {
+			$(this).prop('disabled', true).text('⏳ Loading...');
+			logEl.empty();
+			runImport('jetpack', 0, 0, '');
+		});
+
+		csvBtnEl.on('click', function() {
+			const file = csvFileEl[0].files[0];
+			if (!file) return;
+
+			$(this).prop('disabled', true).text('⏳ Membaca...');
+			logEl.empty();
+			
+			const reader = new FileReader();
+			reader.onload = function(e) {
+				runImport('csv', 0, 0, e.target.result);
+			};
+			reader.readAsText(file);
+		});
+	});
+
+	<hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
+
+	<!-- MeowSync Engine -->
+	<div class="meowpack-settings-section" id="meowpack-sync">
+		<h2>⚡ MeowSync Engine — Secure Copy/Paste</h2>
+		<p class="description">
+			<?php esc_html_e( 'Sinkronisasi pengaturan dan blacklist malware antar situs dengan cepat tanpa file. (Kunci Auto-Share tidak akan disertakan demi keamanan).', 'meowpack' ); ?>
+		</p>
+
+		<?php
+		if ( isset( $_GET['sync_saved'] ) ) {
+			echo '<div class="notice notice-success inline"><p>' . esc_html__( 'Sinkronisasi berhasil! Pengaturan dan Blacklist telah diperbarui.', 'meowpack' ) . '</p></div>';
+		}
+		if ( isset( $_GET['sync_error'] ) ) {
+			echo '<div class="notice notice-error inline"><p>' . esc_html__( 'Gagal sinkronisasi: ' . sanitize_text_field( $_GET['sync_error'] ), 'meowpack' ) . '</p></div>';
+		}
+		?>
+
+		<div class="meowpack-row" style="display:flex; gap:20px; margin-top:20px;">
+			<!-- Export -->
+			<div style="flex:1;">
+				<h3>📤 Salin Config (Situs Ini)</h3>
+				<textarea readonly style="width:100%; height:120px; font-family:monospace; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:10px;" id="meow-sync-export-code" onclick="this.select()"><?php echo esc_textarea( MeowPack_Database::export_sync_data() ); ?></textarea>
+				<button type="button" class="button" onclick="const c = document.getElementById('meow-sync-export-code'); c.select(); document.execCommand('copy'); alert('Kode Config Tersalin!');" style="margin-top:8px;">📋 Copy Config Code</button>
+			</div>
+
+			<!-- Import -->
+			<div style="flex:1;">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="meowpack_import_sync">
+					<?php wp_nonce_field( 'meowpack_sync_import', 'meowpack_sync_nonce' ); ?>
+					<h3>📥 Tempel Config (Situs Lain)</h3>
+					<textarea name="meowpack_sync_code" placeholder="Tempel kode MEOW_CONFIG di sini..." style="width:100%; height:120px; font-family:monospace; font-size:11px; background:#fff; border:1px solid #cbd5e1; border-radius:4px; padding:10px;"></textarea>
+					<button type="submit" class="button button-primary" style="margin-top:8px;" onclick="return confirm('⚠️ Ini akan menimpa pengaturan dan blacklist di situs ini. Lanjutkan?')">⚡ Import & Sinkronkan</button>
+				</form>
+			</div>
+		</div>
+	</div>

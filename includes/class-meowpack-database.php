@@ -536,8 +536,90 @@ class MeowPack_Database {
 			'bot_rules'       => $wpdb->prefix . 'meow_bot_rules',
 			'bot_stats'       => $wpdb->prefix . 'meow_bot_stats',
 			'hotlink_logs'    => $wpdb->prefix . 'meow_hotlink_logs',
-			'content_rules'   => $wpdb->prefix . 'meow_content_rules',  // v2.1.0
-			'content_logs'    => $wpdb->prefix . 'meow_content_logs',   // v2.1.0
+			'content_rules'   => $wpdb->prefix . 'meow_content_rules',
+			'content_logs'    => $wpdb->prefix . 'meow_content_logs',
 		);
+	}
+
+	/**
+	 * Export core settings and content rules into an encoded string.
+	 * Excludes autoshare-specific keys for security.
+	 *
+	 * @return string
+	 */
+	public static function export_sync_data() {
+		global $wpdb;
+		$tables = self::get_tables();
+
+		// 1. Settings (Exclude autoshare keys)
+		$settings_raw = $wpdb->get_results( "SELECT setting_key, setting_value FROM {$tables['settings']}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$settings = array();
+		foreach ( $settings_raw as $row ) {
+			if ( strpos( $row->setting_key, 'autoshare_' ) === 0 ) {
+				continue;
+			}
+			$settings[ $row->setting_key ] = $row->setting_value;
+		}
+
+		// 2. Content Rules (Blacklist/Malware)
+		$rules = $wpdb->get_results( "SELECT keyword, category, action, match_mode, is_active FROM {$tables['content_rules']}", ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		$data = array(
+			'version'   => self::SCHEMA_VERSION,
+			'timestamp' => current_time( 'timestamp' ),
+			'settings'  => $settings,
+			'rules'     => $rules,
+		);
+
+		return 'MEOW_CONFIG_v2::' . base64_encode( wp_json_encode( $data ) );
+	}
+
+	/**
+	 * Import sync data from an encoded string.
+	 *
+	 * @param string $encoded_string The encoded MeowConfig string.
+	 * @return bool|WP_Error
+	 */
+	public static function import_sync_data( $encoded_string ) {
+		global $wpdb;
+
+		if ( strpos( $encoded_string, 'MEOW_CONFIG_v2::' ) !== 0 ) {
+			return new WP_Error( 'invalid_format', 'Format kode MeowConfig tidak valid.' );
+		}
+
+		$payload = substr( $encoded_string, strlen( 'MEOW_CONFIG_v2::' ) );
+		$decoded = base64_decode( $payload );
+		if ( ! $decoded ) {
+			return new WP_Error( 'decode_failed', 'Gagal melakukan decode data.' );
+		}
+
+		$data = json_decode( $decoded, true );
+		if ( ! is_array( $data ) || ! isset( $data['settings'] ) ) {
+			return new WP_Error( 'invalid_json', 'Data JSON tidak valid.' );
+		}
+
+		$tables = self::get_tables();
+
+		// 1. Import Settings
+		foreach ( $data['settings'] as $key => $value ) {
+			$wpdb->replace( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$tables['settings'],
+				array( 'setting_key' => $key, 'setting_value' => $value ),
+				array( '%s', '%s' )
+			);
+			wp_cache_delete( 'meowpack_setting_' . $key, 'meowpack' );
+		}
+
+		// 2. Import Content Rules
+		if ( isset( $data['rules'] ) && is_array( $data['rules'] ) ) {
+			foreach ( $data['rules'] as $rule ) {
+				$wpdb->replace( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+					$tables['content_rules'],
+					$rule
+				);
+			}
+		}
+
+		return true;
 	}
 }

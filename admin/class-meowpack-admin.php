@@ -37,8 +37,9 @@ class MeowPack_Admin {
 		add_action( 'admin_post_meowpack_add_content_rule',       array( $this, 'handle_add_content_rule' ) );
 		add_action( 'admin_post_meowpack_bulk_add_content',       array( $this, 'handle_bulk_add_content' ) );
 		add_action( 'admin_post_meowpack_import_content_rules',   array( $this, 'handle_import_content_rules' ) );
-		add_action( 'admin_post_meowpack_export_content_rules',   array( $this, 'handle_export_content_rules' ) );
 		add_action( 'admin_post_meowpack_reset_content_category', array( $this, 'handle_reset_content_category' ) );
+		// v2.2.0: Settings sync.
+		add_action( 'admin_post_meowpack_import_sync',        array( $this, 'handle_sync_import' ) );
 	}
 
 	/**
@@ -58,12 +59,13 @@ class MeowPack_Admin {
 		add_submenu_page( 'meowpack', __( 'Statistik', 'meowpack' ),           __( 'Statistik', 'meowpack' ),           'manage_options', 'meowpack',                     array( $this, 'page_stats' ) );
 		add_submenu_page( 'meowpack', __( 'Pengaturan', 'meowpack' ),          __( 'Pengaturan', 'meowpack' ),          'manage_options', 'meowpack-settings',            array( $this, 'page_settings' ) );
 		add_submenu_page( 'meowpack', __( 'Auto Share', 'meowpack' ),          __( 'Auto Share', 'meowpack' ),          'manage_options', 'meowpack-autoshare',           array( $this, 'page_autoshare' ) );
-		add_submenu_page( 'meowpack', __( '🤖 AI Bot Manager', 'meowpack' ),   __( '🤖 AI Bot Manager', 'meowpack' ),   'manage_options', 'meowpack-bot-manager',        array( $this, 'page_bot_manager' ) );
-		add_submenu_page( 'meowpack', __( '🛡️ Anti-Hotlink', 'meowpack' ),          __( '🛡️ Anti-Hotlink', 'meowpack' ),          'manage_options', 'meowpack-hotlink',               array( $this, 'page_hotlink' ) );
-		add_submenu_page( 'meowpack', __( '🔐 Captcha', 'meowpack' ),               __( '🔐 Captcha', 'meowpack' ),               'manage_options', 'meowpack-captcha',              array( $this, 'page_captcha' ) );
-		add_submenu_page( 'meowpack', __( '🚫 Filter Konten', 'meowpack' ),         __( '🚫 Filter Konten', 'meowpack' ),         'manage_options', 'meowpack-content-moderation',  array( $this, 'page_content_moderation' ) );
-		add_submenu_page( 'meowpack', __( '🛡️ Malware Scanner', 'meowpack' ),        __( '🛡️ Malware Scanner', 'meowpack' ),        'manage_options', 'meowpack-malware-scanner',      array( $this, 'page_malware_scanner' ) );
-		add_submenu_page( 'meowpack', __( 'Import Jetpack', 'meowpack' ),           __( 'Import Jetpack', 'meowpack' ),           'manage_options', 'meowpack-importer',             array( $this, 'page_importer' ) );
+		add_submenu_page( 'meowpack', __( 'AI Bot Manager', 'meowpack' ),      __( 'AI Bot Manager', 'meowpack' ),      'manage_options', 'meowpack-bot-manager',        array( $this, 'page_bot_manager' ) );
+		add_submenu_page( 'meowpack', __( 'Anti-Hotlink', 'meowpack' ),        __( 'Anti-Hotlink', 'meowpack' ),        'manage_options', 'meowpack-hotlink',               array( $this, 'page_hotlink' ) );
+		add_submenu_page( 'meowpack', __( 'Captcha', 'meowpack' ),             __( 'Captcha', 'meowpack' ),             'manage_options', 'meowpack-captcha',              array( $this, 'page_captcha' ) );
+		add_submenu_page( 'meowpack', __( 'Filter Konten', 'meowpack' ),       __( 'Filter Konten', 'meowpack' ),       'manage_options', 'meowpack-content-moderation',  array( $this, 'page_content_moderation' ) );
+		add_submenu_page( 'meowpack', __( 'Malware Scanner', 'meowpack' ),     __( 'Malware Scanner', 'meowpack' ),      'manage_options', 'meowpack-malware-scanner',      array( $this, 'page_malware_scanner' ) );
+		// Sub-menu hidden (moved to settings)
+		// add_submenu_page( 'meowpack', __( 'Import Jetpack', 'meowpack' ),    __( 'Import Jetpack', 'meowpack' ),      'manage_options', 'meowpack-importer',             array( $this, 'page_importer' ) );
 	}
 
 	/**
@@ -828,6 +830,38 @@ class MeowPack_Admin {
 		}
 
 		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'import', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Handle MeowSync config import.
+	 */
+	public function handle_sync_import() {
+		if ( ! isset( $_POST['meowpack_sync_nonce'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['meowpack_sync_nonce'] ) ), 'meowpack_sync_import' ) ) {
+			wp_die( 'Keamanan tidak valid.' );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Akses ditolak.' );
+		}
+
+		$config_string = trim( $_POST['meowpack_sync_code'] ?? '' );
+		if ( empty( $config_string ) ) {
+			wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-settings', 'sync_error' => 'empty' ), admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		$result = MeowPack_Database::import_sync_data( $config_string );
+
+		if ( is_wp_error( $result ) ) {
+			wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-settings', 'sync_error' => $result->get_error_code() ), admin_url( 'admin.php' ) ) );
+		} else {
+			wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-settings', 'sync_saved' => '1' ), admin_url( 'admin.php' ) ) );
+		}
 		exit;
 	}
 }

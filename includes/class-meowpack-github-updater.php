@@ -179,7 +179,7 @@ class MeowPack_GitHub_Updater {
 		$plugin_info = new stdClass();
 		$plugin_info->name          = 'MeowPack';
 		$plugin_info->slug          = $this->slug;
-		$plugin_info->version       = ( defined( 'MEOWPACK_VERSION' ) ? MEOWPACK_VERSION : '2.1.0' ) . '.' . substr( $remote_sha, 0, 7 );
+		$plugin_info->version       = ( defined( 'MEOWPACK_VERSION' ) ? MEOWPACK_VERSION : '2.2.0' ) . '.' . substr( $remote_sha, 0, 7 );
 		$plugin_info->author        = '<a href="https://github.com/' . esc_attr( $this->username ) . '">Akbar Bahaulloh</a>';
 		$plugin_info->homepage      = 'https://github.com/' . $this->username . '/' . $this->repository;
 		$plugin_info->requires      = '5.0';
@@ -187,7 +187,7 @@ class MeowPack_GitHub_Updater {
 		$plugin_info->downloaded    = 0;
 		$plugin_info->last_updated  = $date;
 		$plugin_info->sections      = array(
-			'description' => 'MeowPack adalah plugin pengganti Jetpack ringan yang melakukan update instan (rolling-release) dari GitHub.',
+			'description' => 'The ultimate security and optimization powerhouse for WordPress. Real-time local stats, AI-powered protection, malware scanning, and instant social engine — privacy-first, zero cloud dependencies, 100% control.',
 			'changelog'   => "<strong>Commit Baru (" . substr( $remote_sha, 0, 7 ) . "):</strong><br><br>" . nl2br( $message ),
 		);
 		$plugin_info->download_link = "https://api.github.com/repos/{$this->username}/{$this->repository}/zipball/main";
