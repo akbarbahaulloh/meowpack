@@ -171,7 +171,12 @@ class MeowPack_Admin {
 
 		foreach ( $fields as $key => $sanitizer ) {
 			if ( isset( $_POST[ $key ] ) ) {
-				$value = call_user_func( $sanitizer, wp_unslash( $_POST[ $key ] ) );
+				$val_raw = wp_unslash( $_POST[ $key ] );
+				if ( is_array( $val_raw ) ) {
+					$value = implode( ',', array_map( 'sanitize_text_field', $val_raw ) );
+				} else {
+					$value = call_user_func( $sanitizer, $val_raw );
+				}
 				MeowPack_Database::update_setting( $key, $value );
 			} elseif ( in_array( $sanitizer, array( 'absint' ), true ) ) {
 				// Unchecked checkboxes won't be in POST.

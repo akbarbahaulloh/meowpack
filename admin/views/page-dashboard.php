@@ -21,6 +21,7 @@ $stats = MeowPack_Core::get_instance()->stats;
 			'today'   => __( 'Hari Ini', 'meowpack' ),
 			'week'    => __( 'Minggu Ini', 'meowpack' ),
 			'month'   => __( 'Bulan Ini', 'meowpack' ),
+			'year'    => __( 'Tahun Ini', 'meowpack' ),
 			'alltime' => __( 'Sepanjang Waktu', 'meowpack' ),
 		);
 		foreach ( $periods as $period => $label ) :
@@ -100,85 +101,7 @@ $stats = MeowPack_Core::get_instance()->stats;
 			<?php esc_html_e( 'File CSV kompatibel dengan Excel (UTF-8 BOM). Data mentah dibatasi 50.000 baris.', 'meowpack' ); ?>
 		</p>
 	</div>
-
-	<div class="meowpack-row">
-
-		<!-- Top Posts -->
-		<div class="meowpack-section meowpack-section--half">
-			<div class="meowpack-section__header">
-				<h2><?php esc_html_e( 'Artikel Terpopuler', 'meowpack' ); ?></h2>
-				<select id="meowpack-top-period">
-					<option value="alltime" selected><?php esc_html_e( 'Semua Waktu', 'meowpack' ); ?></option>
-					<option value="today"><?php esc_html_e( 'Hari Ini', 'meowpack' ); ?></option>
-					<option value="this_week"><?php esc_html_e( 'Minggu Ini', 'meowpack' ); ?></option>
-					<option value="this_month"><?php esc_html_e( 'Bulan Ini', 'meowpack' ); ?></option>
-				</select>
-			</div>
-			<div id="meowpack-top-posts">
-				<?php
-				$top = $stats->get_top_posts( 10, 'alltime' );
-				if ( empty( $top ) ) :
-				?>
-				<p class="meowpack-empty"><?php esc_html_e( 'Belum ada data.', 'meowpack' ); ?></p>
-				<?php else : ?>
-				<ol class="meowpack-top-list">
-					<?php foreach ( $top as $i => $post ) : ?>
-					<li class="meowpack-top-item">
-						<span class="meowpack-top-rank"><?php echo esc_html( $i + 1 ); ?></span>
-						<div class="meowpack-top-info">
-							<a href="<?php echo esc_url( $post['url'] ); ?>" target="_blank"><?php echo esc_html( $post['title'] ); ?></a>
-						</div>
-						<span class="meowpack-top-views"><?php echo esc_html( MeowPack_ViewCounter::format_number( $post['views'] ) ); ?></span>
-					</li>
-					<?php endforeach; ?>
-				</ol>
-				<?php endif; ?>
-			</div>
-		</div>
-
-		<!-- Source Breakdown -->
-		<div class="meowpack-section meowpack-section--half">
-			<div class="meowpack-section__header">
-				<h2><?php esc_html_e( 'Sumber Kunjungan', 'meowpack' ); ?></h2>
-			</div>
-			<div class="meowpack-chart-container meowpack-chart-container--pie">
-				<canvas id="meowpack-chart-sources" height="250"></canvas>
-			</div>
-			<?php
-			$sources = $stats->get_source_breakdown( 'alltime' );
-			$total_s = array_sum( $sources );
-			if ( $total_s > 0 ) :
-			?>
-			<ul class="meowpack-source-list">
-				<?php
-				$source_labels = array(
-					'direct'   => __( 'Langsung', 'meowpack' ),
-					'search'   => __( 'Pencarian', 'meowpack' ),
-					'social'   => __( 'Sosial Media', 'meowpack' ),
-					'referral' => __( 'Referral', 'meowpack' ),
-					'email'    => __( 'Email', 'meowpack' ),
-				);
-				$source_colors = array(
-					'direct'   => '#6366f1',
-					'search'   => '#06b6d4',
-					'social'   => '#f59e0b',
-					'referral' => '#10b981',
-					'email'    => '#ec4899',
-				);
-				foreach ( $sources as $key => $val ) :
-					$pct = $total_s > 0 ? round( $val / $total_s * 100, 1 ) : 0;
-				?>
-				<li class="meowpack-source-item">
-					<span class="meowpack-source-dot" style="background:<?php echo esc_attr( $source_colors[ $key ] ?? '#888' ); ?>"></span>
-					<span class="meowpack-source-name"><?php echo esc_html( $source_labels[ $key ] ?? $key ); ?></span>
-					<span class="meowpack-source-pct"><?php echo esc_html( $pct ); ?>%</span>
-					<span class="meowpack-source-val"><?php echo esc_html( MeowPack_ViewCounter::format_number( $val ) ); ?></span>
-				</li>
-				<?php endforeach; ?>
-			</ul>
-			<?php endif; ?>
-		</div>
-	</div>
+</div>
 </div>
 
 <script>

@@ -14,9 +14,19 @@ $current_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'overview'
 
 $tabs = array(
 	'overview' => array(
-		'label' => __( 'Ringkasan', 'meowpack' ),
-		'icon'  => '📊',
+		'label' => __( 'Pengunjung', 'meowpack' ),
+		'icon'  => '📈',
 		'view'  => 'page-dashboard.php',
+	),
+	'posts'    => array(
+		'label' => __( 'Artikel', 'meowpack' ),
+		'icon'  => '📄',
+		'view'  => 'page-posts-stats.php',
+	),
+	'sources'  => array(
+		'label' => __( 'Sumber', 'meowpack' ),
+		'icon'  => '🔍',
+		'view'  => 'page-sources-stats.php',
 	),
 	'device'   => array(
 		'label' => __( 'Perangkat', 'meowpack' ),
@@ -32,11 +42,6 @@ $tabs = array(
 		'label' => __( 'Penulis', 'meowpack' ),
 		'icon'  => '✍️',
 		'view'  => 'page-author-stats.php',
-	),
-	'clicks'   => array(
-		'label' => __( 'URL Keluar', 'meowpack' ),
-		'icon'  => '🔗',
-		'view'  => 'page-click-tracker.php',
 	),
 );
 

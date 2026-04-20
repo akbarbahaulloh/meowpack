@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || exit;
 
 global $wpdb;
 $table  = $wpdb->prefix . 'meow_visits';
-$period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'month';
+$period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'today';
 $drill  = isset( $_GET['country'] ) ? sanitize_text_field( wp_unslash( $_GET['country'] ) ) : '';
 
 switch ( $period ) {

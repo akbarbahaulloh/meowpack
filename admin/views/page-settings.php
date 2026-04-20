@@ -94,8 +94,17 @@ $s = function( $key, $default = '' ) {
 				<tr>
 					<th><?php esc_html_e( 'Jenis Konten Dilacak', 'meowpack' ); ?></th>
 					<td>
-						<input type="text" name="track_post_types" class="regular-text" value="<?php echo esc_attr( $s( 'track_post_types', 'post,page' ) ); ?>">
-						<p class="description"><?php esc_html_e( 'Pisahkan dengan koma. Contoh: post,page,custom_type', 'meowpack' ); ?></p>
+						<?php
+						$post_types = get_post_types( array( 'public' => true ), 'objects' );
+						$tracked    = explode( ',', $s( 'track_post_types', 'post,page' ) );
+						foreach ( $post_types as $type ) :
+						?>
+							<label style="margin-right: 15px; display: inline-block;">
+								<input type="checkbox" name="track_post_types[]" value="<?php echo esc_attr( $type->name ); ?>" <?php checked( in_array( $type->name, $tracked, true ) ); ?>>
+								<?php echo esc_html( $type->label ); ?>
+							</label>
+						<?php endforeach; ?>
+						<p class="description"><?php esc_html_e( 'Centang tipe konten yang ingin dihitung statistiknya dan ditampilkan View Counter-nya.', 'meowpack' ); ?></p>
 					</td>
 				</tr>
 				<tr>

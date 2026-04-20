@@ -141,50 +141,6 @@
 		});
 	}
 
-	// =========================================================
-	// Top Posts Period Selector
-	// =========================================================
-
-	function initTopPeriodSelector() {
-		var selectEl = document.getElementById('meowpack-top-period');
-		if (!selectEl) return;
-
-		selectEl.addEventListener('change', function () {
-			var period = this.value;
-			var container = document.getElementById('meowpack-top-posts');
-			if (!container) return;
-
-			container.style.opacity = '0.5';
-
-			fetch(
-				meowpackAdmin.apiBase + 'stats?type=top_posts&period=' + encodeURIComponent(period) + '&count=10',
-				{
-					headers: { 'X-WP-Nonce': meowpackAdmin.nonce },
-				}
-			)
-				.then(function (r) { return r.json(); })
-				.then(function (posts) {
-					container.style.opacity = '1';
-					if (!posts || !posts.length) {
-						container.innerHTML = '<p class="meowpack-empty">Belum ada data.</p>';
-						return;
-					}
-					var html = '<ol class="meowpack-top-list">';
-					posts.forEach(function (post, i) {
-						html += '<li class="meowpack-top-item">' +
-							'<span class="meowpack-top-rank">' + (i + 1) + '</span>' +
-							'<div class="meowpack-top-info"><a href="' + post.url + '" target="_blank">' + escHtml(post.title) + '</a></div>' +
-							'<span class="meowpack-top-views">' + fmtNum(post.views) + '</span>' +
-							'</li>';
-					});
-					html += '</ol>';
-					container.innerHTML = html;
-				})
-				.catch(function () {
-					container.style.opacity = '1';
-				});
-		});
-	}
 
 	// =========================================================
 	// Share Platforms Checkbox → Hidden Input
@@ -313,7 +269,6 @@
 
 	document.addEventListener('DOMContentLoaded', function () {
 		initDashboardCharts();
-		initTopPeriodSelector();
 		initSharePlatformCheckboxes();
 		initExportCsv();
 	});
