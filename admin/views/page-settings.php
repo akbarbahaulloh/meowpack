@@ -395,6 +395,7 @@ $s = function( $key, $default = '' ) {
 						if (res.preview) {
 							prevCont.text(res.preview);
 							prevBox.fadeIn();
+							confirmBtn.prop('disabled', false).text('💾 Konfirmasi & Impor Data Ini');
 						}
 						btn.text('👁️ P' + (currentPreviewStep + 1) + ' Selesai');
 						prevBtns.prop('disabled', false);

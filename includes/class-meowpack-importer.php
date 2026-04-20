@@ -182,25 +182,33 @@ class MeowPack_Importer {
 				break;
 
 			case 1:
-				// Step 1: Pull Top Posts (All Time)
-				$data = $this->fetch_jetpack_api( 'stats/post-views', array( 'date' => 'all', 'max' => 100 ) );
+				// Step 1: Pull Top Posts
+				$data = $this->fetch_jetpack_api( 'stats/top-posts', array( 'max' => 100 ) ); // WP.com API parameter fallbacks
 				if ( is_wp_error( $data ) ) {
 					return array( 'success' => false, 'error' => $data->get_error_message() );
 				}
 
-				// Depending on API response, top posts might be in 'days' or 'post-views' array
-				$posts = $data['days'][0]['post-views'] ?? ( $data['post-views'] ?? array() );
+				// Depending on API response, WP.com wraps the array in 'days' -> 'YYYY-MM-DD' -> 'postviews'
+				$days_array = $data['days'] ?? array();
+				$day_data   = reset( $days_array ); // dynamically get the first key (which is the date string)
+				$posts      = $day_data['postviews'] ?? array();
+
 				foreach ( $posts as $p ) {
-					$post_id = absint( $p['post']['ID'] ?? 0 );
+					$post_id = absint( $p['id'] ?? 0 );
 					$views   = absint( $p['views'] ?? 0 );
 					if ( ! $post_id || ! $views ) continue;
 					
 					// Calculate fallback date based on publish date
 					$date = '1970-01-01';
-					$post = get_post( $post_id );
-					if ( $post ) {
-						$date = gmdate( 'Y-m-d', strtotime( $post->post_date ) );
+					if ( ! empty( $p['date'] ) ) {
+						$date = gmdate( 'Y-m-d', strtotime( $p['date'] ) );
+					} else {
+						$post = get_post( $post_id );
+						if ( $post ) {
+							$date = gmdate( 'Y-m-d', strtotime( $post->post_date ) );
+						}
 					}
+
 					$result = $this->upsert_daily_stat( $date, $post_id, $views, 0 );
 					$result ? $imported++ : $skipped++;
 				}
@@ -209,15 +217,17 @@ class MeowPack_Importer {
 				break;
 
 			case 2:
-				// Step 2: Pull Top Referrers (All Time)
-				$data = $this->fetch_jetpack_api( 'stats/referrers', array( 'date' => 'all', 'max' => 50 ) );
+				// Step 2: Pull Top Referrers
+				$data = $this->fetch_jetpack_api( 'stats/referrers', array( 'max' => 50 ) );
 				if ( is_wp_error( $data ) ) {
-					// Soft fail since referrers aren't critical
 					$done = true;
 					break;
 				}
 
-				$groups = $data['days'][0]['groups'] ?? ( $data['groups'] ?? array() );
+				$days_array = $data['days'] ?? array();
+				$day_data   = reset( $days_array ); // dynamically get the first key (the date string)
+				$groups     = $day_data['groups'] ?? array();
+
 				foreach ( $groups as $group ) {
 					$name  = strtolower( trim( $group['name'] ?? '' ) );
 					$views = absint( $group['total'] ?? 0 );
@@ -240,6 +250,12 @@ class MeowPack_Importer {
 			default:
 				$done = true;
 				$next_step = $step;
+		}
+
+		if ( $imported > 0 ) {
+			if ( class_exists( 'MeowPack_Core' ) && isset( MeowPack_Core::get_instance()->stats ) ) {
+				MeowPack_Core::get_instance()->stats->flush_stat_caches();
+			}
 		}
 
 		return array(
