@@ -21,123 +21,131 @@
 	// Dashboard Charts
 	// =========================================================
 
+	// =========================================================
+	// Dashboard Charts (Pro Version)
+	// =========================================================
+
+	var vChart = null;
+
 	function initDashboardCharts() {
 		var chartCanvas = document.getElementById('meowpack-chart-visitors');
-		var sourceCanvas = document.getElementById('meowpack-chart-sources');
-
-		if (!chartCanvas && !sourceCanvas) {
-			return; // Not on dashboard page.
-		}
+		if (!chartCanvas || !window.meowpackChartData) return;
 
 		loadChartJs(function () {
-			var loadingEl = document.querySelector('.meowpack-chart-loading');
-			if (loadingEl) loadingEl.style.display = 'none';
+			var ctx = chartCanvas.getContext('2d');
+			
+			// Create Gradients.
+			var gradPV = ctx.createLinearGradient(0, 0, 0, 300);
+			gradPV.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+			gradPV.addColorStop(1, 'rgba(59, 130, 246, 0)');
 
-			// Visitor chart (line).
-			if (chartCanvas && window.meowpackChartData) {
-				var labels = meowpackChartData.map(function (d) {
-					return d.date.slice(5); // MM-DD.
-				});
-				var uvData = meowpackChartData.map(function (d) { return d.unique_visitors; });
-				var pvData = meowpackChartData.map(function (d) { return d.total_views; });
+			var gradUV = ctx.createLinearGradient(0, 0, 0, 300);
+			gradUV.addColorStop(0, 'rgba(37, 99, 235, 0.1)');
+			gradUV.addColorStop(1, 'rgba(37, 99, 235, 0)');
 
-				new Chart(chartCanvas, {
-					type: 'line',
-					data: {
-						labels: labels,
-						datasets: [
-							{
-								label: 'Pengunjung Unik',
-								data: uvData,
-								borderColor: '#6366f1',
-								backgroundColor: 'rgba(99,102,241,.1)',
-								borderWidth: 2,
-								pointRadius: 3,
-								tension: 0.4,
-								fill: true,
-							},
-							{
-								label: 'Pageviews',
-								data: pvData,
-								borderColor: '#06b6d4',
-								backgroundColor: 'rgba(6,182,212,.06)',
-								borderWidth: 2,
-								pointRadius: 3,
-								tension: 0.4,
-								fill: true,
-							},
-						],
-					},
-					options: {
-						responsive: true,
-						interaction: { mode: 'index', intersect: false },
-						plugins: {
-							legend: { display: false },
-							tooltip: {
-								callbacks: {
-									label: function (ctx) {
-										return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString('id-ID');
-									},
-								},
-							},
+			var labels = meowpackChartData.map(function (d) { return d.date.slice(5); });
+			var pvData = meowpackChartData.map(function (d) { return d.total_views; });
+			var uvData = meowpackChartData.map(function (d) { return d.unique_visitors; });
+
+			vChart = new Chart(chartCanvas, {
+				type: 'line',
+				data: {
+					labels: labels,
+					datasets: [
+						{
+							label: 'Pageviews',
+							data: pvData,
+							borderColor: '#3b82f6',
+							backgroundColor: gradPV,
+							fill: true,
+							tension: 0.3,
+							pointRadius: 0,
+							pointHoverRadius: 4,
+							borderWidth: 2
 						},
-						scales: {
-							x: {
-								ticks: { font: { size: 11 }, maxTicksLimit: 10 },
-								grid: { color: 'rgba(0,0,0,.04)' },
-							},
-							y: {
-								ticks: {
-									font: { size: 11 },
-									callback: function (v) {
-										return v >= 1000 ? (v / 1000).toFixed(1) + 'rb' : v;
-									},
-								},
-								grid: { color: 'rgba(0,0,0,.04)' },
-							},
-						},
+						{
+							label: 'Pengunjung',
+							data: uvData,
+							borderColor: '#1d4ed8',
+							backgroundColor: gradUV,
+							fill: true,
+							tension: 0.3,
+							pointRadius: 0,
+							pointHoverRadius: 4,
+							borderWidth: 2
+						}
+					]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					interaction: { mode: 'index', intersect: false },
+					plugins: {
+						legend: { display: false },
+						tooltip: {
+							backgroundColor: '#1e293b',
+							padding: 12,
+							titleFont: { size: 13, weight: 'bold' },
+							bodyFont: { size: 12 },
+							cornerRadius: 8,
+							callbacks: {
+								label: function(ctx) {
+									return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString('id-ID');
+								}
+							}
+						}
 					},
-				});
-			}
+					scales: {
+						x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+						y: { beginAtZero: true, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+					}
+				}
+			});
 
-			// Source pie chart.
-			if (sourceCanvas && window.meowpackSourceData) {
-				var src = window.meowpackSourceData;
-				var srcLabels = { direct: 'Langsung', search: 'Pencarian', social: 'Sosial Media', referral: 'Referral', email: 'Email' };
-				var srcColors = ['#6366f1', '#06b6d4', '#f59e0b', '#10b981', '#ec4899'];
-				var srcKeys   = Object.keys(src);
-				var srcVals   = srcKeys.map(function (k) { return src[k]; });
-				var srcLbls   = srcKeys.map(function (k) { return srcLabels[k] || k; });
+			initChartControls();
+		});
+	}
 
-				new Chart(sourceCanvas, {
-					type: 'doughnut',
-					data: {
-						labels: srcLbls,
-						datasets: [{
-							data: srcVals,
-							backgroundColor: srcColors,
-							borderWidth: 2,
-							borderColor: '#fff',
-						}],
-					},
-					options: {
-						responsive: true,
-						cutout: '65%',
-						plugins: {
-							legend: { display: false },
-							tooltip: {
-								callbacks: {
-									label: function (ctx) {
-										var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
-										var pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
-										return ctx.label + ': ' + ctx.parsed.toLocaleString('id-ID') + ' (' + pct + '%)';
-									},
-								},
-							},
-						},
-					},
-				});
-			}
+	function initChartControls() {
+		var select = document.getElementById('meowpack-chart-days');
+		var togglePV = document.getElementById('toggle-pv');
+		var toggleUV = document.getElementById('toggle-uv');
+
+		if (!select) return;
+
+		// Period change handler.
+		select.addEventListener('change', function() {
+			var days = this.value;
+			var container = document.querySelector('.meowpack-chart-container');
+			container.style.opacity = '0.5';
+
+			fetch(meowpackAdmin.apiBase + 'stats?type=chart&days=' + days, {
+				headers: { 'X-WP-Nonce': meowpackAdmin.nonce }
+			})
+			.then(r => r.json())
+			.then(data => {
+				container.style.opacity = '1';
+				if (!data.chart || !vChart) return;
+
+				// Update Chart.
+				vChart.data.labels = data.chart.map(d => d.date.slice(5));
+				vChart.data.datasets[0].data = data.chart.map(d => d.total_views);
+				vChart.data.datasets[1].data = data.chart.map(d => d.unique_visitors);
+				vChart.update();
+
+				// Update Metrics Grid.
+				document.getElementById('metric-pv-val').textContent = fmtNum(data.totals.pv);
+				document.getElementById('metric-uv-val').textContent = fmtNum(data.totals.uv);
+			});
+		});
+
+		// Toggle line visibility.
+		[togglePV, toggleUV].forEach((el, idx) => {
+			if (!el) return;
+			el.addEventListener('change', function() {
+				vChart.setDatasetVisibility(idx, this.checked);
+				vChart.update();
+			});
 		});
 	}
 

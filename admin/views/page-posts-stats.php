@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $stats  = MeowPack_Core::get_instance()->stats;
-$period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'this_month';
+$period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'today';
 
 $period_options = array(
 	'today'      => __( 'Hari Ini', 'meowpack' ),

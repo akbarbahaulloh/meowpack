@@ -36,19 +36,56 @@ $stats = MeowPack_Core::get_instance()->stats;
 		<?php endforeach; ?>
 	</div>
 
-	<!-- Chart: 30-day visitors -->
+	<!-- Pro Chart Section -->
 	<div class="meowpack-section">
 		<div class="meowpack-section__header">
-			<h2><?php esc_html_e( 'Grafik 30 Hari Terakhir', 'meowpack' ); ?></h2>
-			<div class="meowpack-chart-legend">
-				<span class="meowpack-legend meowpack-legend--uv"><?php esc_html_e( 'Pengunjung Unik', 'meowpack' ); ?></span>
-				<span class="meowpack-legend meowpack-legend--pv"><?php esc_html_e( 'Pageviews', 'meowpack' ); ?></span>
+			<div style="display: flex; align-items: center; gap: 20px;">
+				<h2 style="font-size: 20px; font-weight: 700;"><?php esc_html_e( 'Tampilan', 'meowpack' ); ?></h2>
+				<div class="meowpack-chart-toggles" style="display: flex; gap: 15px; font-size: 13px;">
+					<label><input type="checkbox" id="toggle-pv" checked> <?php esc_html_e( 'Pageviews', 'meowpack' ); ?></label>
+					<label><input type="checkbox" id="toggle-uv" checked> <?php esc_html_e( 'Pengunjung', 'meowpack' ); ?></label>
+				</div>
+			</div>
+			<div class="meowpack-chart-period">
+				<select id="meowpack-chart-days" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #ddd;">
+					<option value="7"><?php esc_html_e( '7 Hari Terakhir', 'meowpack' ); ?></option>
+					<option value="30" selected><?php esc_html_e( '30 Hari Terakhir', 'meowpack' ); ?></option>
+					<option value="90"><?php esc_html_e( '90 Hari Terakhir', 'meowpack' ); ?></option>
+				</select>
 			</div>
 		</div>
+
 		<div class="meowpack-chart-container">
 			<canvas id="meowpack-chart-visitors" height="300"></canvas>
 		</div>
-		<p class="meowpack-chart-loading"><?php esc_html_e( 'Memuat grafik...', 'meowpack' ); ?></p>
+		
+		<!-- Metrics Grid (Summary for Chart Period) -->
+		<?php
+		// Default 30 days totals.
+		$chart_data      = $stats->get_last_n_days( 30 );
+		$total_pv_chart  = array_sum( array_column( $chart_data, 'total_views' ) );
+		$total_uv_chart  = array_sum( array_column( $chart_data, 'unique_visitors' ) );
+		$total_comments  = $stats->get_total_comments( 'alltime' );
+		$total_reactions = $stats->get_total_reactions( 'alltime' );
+		?>
+		<div class="meowpack-metrics-grid">
+			<div class="meowpack-metric-box is-active" data-metric="pv">
+				<div class="meowpack-metric-box__label">👁️ <?php esc_html_e( 'Tampilan', 'meowpack' ); ?></div>
+				<div class="meowpack-metric-box__value" id="metric-pv-val"><?php echo esc_html( MeowPack_ViewCounter::format_number( $total_pv_chart ) ); ?></div>
+			</div>
+			<div class="meowpack-metric-box" data-metric="uv">
+				<div class="meowpack-metric-box__label">👥 <?php esc_html_e( 'Pengunjung', 'meowpack' ); ?></div>
+				<div class="meowpack-metric-box__value" id="metric-uv-val"><?php echo esc_html( MeowPack_ViewCounter::format_number( $total_uv_chart ) ); ?></div>
+			</div>
+			<div class="meowpack-metric-box">
+				<div class="meowpack-metric-box__label">💬 <?php esc_html_e( 'Komentar', 'meowpack' ); ?></div>
+				<div class="meowpack-metric-box__value"><?php echo esc_html( MeowPack_ViewCounter::format_number( $total_comments ) ); ?></div>
+			</div>
+			<div class="meowpack-metric-box">
+				<div class="meowpack-metric-box__label">❤️ <?php esc_html_e( 'Reaksi', 'meowpack' ); ?></div>
+				<div class="meowpack-metric-box__value"><?php echo esc_html( MeowPack_ViewCounter::format_number( $total_reactions ) ); ?></div>
+			</div>
+		</div>
 	</div>
 
 	<!-- Export CSV Section -->

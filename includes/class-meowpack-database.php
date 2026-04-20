@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class MeowPack_Database {
 
 	/** @var string Database schema version. */
-	const SCHEMA_VERSION = '2.2.0';
+	const SCHEMA_VERSION = '2.4.0';
 
 	/** @var string Option key for stored schema version. */
 	const SCHEMA_OPTION = 'meowpack_db_version';
@@ -216,6 +216,20 @@ class MeowPack_Database {
 			INDEX idx_domain (referrer_domain)
 		) $charset;";
 
+		// -----------------------------------------------------------------------
+		// [NEW v2.4.0] Table: post reactions (emojis).
+		// -----------------------------------------------------------------------
+		$sql_reactions = "CREATE TABLE {$wpdb->prefix}meow_reactions (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			post_id BIGINT UNSIGNED NOT NULL,
+			reaction_type VARCHAR(20) NOT NULL,
+			ip_hash VARCHAR(64) NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			INDEX idx_post_reaction (post_id, reaction_type),
+			INDEX idx_ip_post (ip_hash, post_id)
+		) $charset;";
+
 		dbDelta( $sql_visits );
 		dbDelta( $sql_daily );
 		dbDelta( $sql_share_logs );
@@ -278,6 +292,7 @@ class MeowPack_Database {
 		dbDelta( $sql_content_rules );
 		dbDelta( $sql_content_logs );
 		dbDelta( $sql_malware_logs );
+		dbDelta( $sql_reactions );
 
 		// Seed default settings.
 		self::seed_defaults();
@@ -512,6 +527,7 @@ class MeowPack_Database {
 			$wpdb->prefix . 'meow_hotlink_logs',
 			$wpdb->prefix . 'meow_content_rules',  // v2.1.0
 			$wpdb->prefix . 'meow_content_logs',   // v2.1.0
+			$wpdb->prefix . 'meow_reactions',      // v2.4.0
 		);
 
 		foreach ( $tables as $table ) {
@@ -538,6 +554,7 @@ class MeowPack_Database {
 			'hotlink_logs'    => $wpdb->prefix . 'meow_hotlink_logs',
 			'content_rules'   => $wpdb->prefix . 'meow_content_rules',
 			'content_logs'    => $wpdb->prefix . 'meow_content_logs',
+			'reactions'       => $wpdb->prefix . 'meow_reactions',
 		);
 	}
 

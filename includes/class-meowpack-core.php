@@ -56,6 +56,9 @@ class MeowPack_Core {
 	/** @var MeowPack_Frontend_Enhancer */
 	public $frontend;
 
+	/** @var MeowPack_Reactions */
+	public $reactions;
+
 	/**
 	 * Get singleton instance.
 	 *
@@ -95,6 +98,10 @@ class MeowPack_Core {
 		
 		if ( class_exists( 'MeowPack_Frontend_Enhancer' ) ) {
 			$this->frontend = new MeowPack_Frontend_Enhancer();
+		}
+
+		if ( class_exists( 'MeowPack_Reactions' ) ) {
+			$this->reactions = new MeowPack_Reactions();
 		}
 
 		if ( class_exists( 'MeowPack_GitHub_Updater' ) ) {
@@ -200,6 +207,11 @@ class MeowPack_Core {
 				),
 			)
 		);
+
+		// --- Reactions API -----------------------------------------------------
+		if ( class_exists( 'MeowPack_Reactions' ) ) {
+			MeowPack_Reactions::register_routes( $this );
+		}
 	}
 
 	/**

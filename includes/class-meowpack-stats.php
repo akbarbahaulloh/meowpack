@@ -156,8 +156,9 @@ class MeowPack_Stats {
 				$where = $wpdb->prepare( 'stat_date = %s', current_time( 'Y-m-d' ) );
 				break;
 			case 'week':
-				$start = current_time( 'Y-m-d', strtotime( 'monday this week' ) );
-				$where = $wpdb->prepare( 'stat_date >= %s', $start );
+				// Monday of this week in site's timezone.
+				$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+				$where = $wpdb->prepare( 'stat_date >= %s', $monday );
 				break;
 			case 'month':
 				$start = current_time( 'Y-m' ) . '-01';
@@ -219,7 +220,8 @@ class MeowPack_Stats {
 		global $wpdb;
 		$stats_table = $wpdb->prefix . 'meow_daily_stats';
 		$visits_table = $wpdb->prefix . 'meow_visits';
-		$start       = current_time( 'Y-m-d', strtotime( "-{$days} days" ) );
+		$now_ts      = current_time( 'timestamp' );
+		$start       = date( 'Y-m-d', strtotime( "-{$days} days", $now_ts ) );
 
 		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
@@ -235,7 +237,7 @@ class MeowPack_Stats {
 		// Fill missing dates with zeroes.
 		$result = array();
 		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$date          = current_time( 'Y-m-d', strtotime( "-{$i} days" ) );
+			$date = date( 'Y-m-d', strtotime( "-{$i} days", $now_ts ) );
 			$result[ $date ] = array(
 				'date'             => $date,
 				'unique_visitors'  => 0,
@@ -292,16 +294,17 @@ class MeowPack_Stats {
 
 		switch ( $period ) {
 			case 'today':
-				$where_agg   = $wpdb->prepare( 'stat_date = %s', current_time( 'Y-m-d' ) );
+				$where_agg   = '1=0';
 				$where_today = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) );
 				break;
 			case 'this_week':
-				$start = current_time( 'Y-m-d', strtotime( 'monday this week' ) );
-				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
-				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
+				$now_ts      = current_time( 'timestamp' );
+				$monday      = date( 'Y-m-d', strtotime( 'monday this week', $now_ts ) );
+				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $monday );
+				$where_today = $wpdb->prepare( 'visit_date >= %s', $monday );
 				break;
 			case 'this_month':
-				$start = current_time( 'Y-m' ) . '-01';
+				$start       = current_time( 'Y-m' ) . '-01';
 				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
 				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
 				break;
@@ -388,16 +391,17 @@ class MeowPack_Stats {
 
 		switch ( $period ) {
 			case 'today':
-				$where_agg   = $wpdb->prepare( 'stat_date = %s', current_time( 'Y-m-d' ) );
+				$where_agg   = '1=0';
 				$where_today = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) );
 				break;
 			case 'this_week':
-				$start = current_time( 'Y-m-d', strtotime( 'monday this week' ) );
-				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
-				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
+				$now_ts      = current_time( 'timestamp' );
+				$monday      = date( 'Y-m-d', strtotime( 'monday this week', $now_ts ) );
+				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $monday );
+				$where_today = $wpdb->prepare( 'visit_date >= %s', $monday );
 				break;
 			case 'this_month':
-				$start = current_time( 'Y-m' ) . '-01';
+				$start       = current_time( 'Y-m' ) . '-01';
 				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
 				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
 				break;
@@ -441,8 +445,6 @@ class MeowPack_Stats {
 		);
 
 		set_transient( $cache_key, $result, 300 );
-
-		set_transient( $cache_key, $result, HOUR_IN_SECONDS );
 
 		return $result;
 	}
@@ -504,9 +506,54 @@ class MeowPack_Stats {
 		);
 
 		$views = $views_today + $views_agg;
-		set_transient( $cache_key, $views, HOUR_IN_SECONDS );
+		set_transient( $cache_key, $views, 300 );
 
 		return $views;
+	}
+
+	/**
+	 * Get total comments count for a period.
+	 */
+	public function get_total_comments( $period = 'alltime' ) {
+		global $wpdb;
+		$where = '';
+		switch ( $period ) {
+			case 'today':
+				$where = $wpdb->prepare( "AND comment_date >= %s", current_time( 'Y-m-d' ) . ' 00:00:00' );
+				break;
+			case 'week':
+				$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+				$where = $wpdb->prepare( "AND comment_date >= %s", $monday . ' 00:00:00' );
+				break;
+			case 'month':
+				$where = $wpdb->prepare( "AND comment_date >= %s", current_time( 'Y-m' ) . '-01 00:00:00' );
+				break;
+		}
+
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_approved = '1' {$where}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	}
+
+	/**
+	 * Get total reactions count for a period.
+	 */
+	public function get_total_reactions( $period = 'alltime' ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'meow_reactions';
+		$where = '1=1';
+		switch ( $period ) {
+			case 'today':
+				$where = $wpdb->prepare( "created_at >= %s", current_time( 'Y-m-d' ) . ' 00:00:00' );
+				break;
+			case 'week':
+				$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+				$where = $wpdb->prepare( "created_at >= %s", $monday . ' 00:00:00' );
+				break;
+			case 'month':
+				$where = $wpdb->prepare( "created_at >= %s", current_time( 'Y-m' ) . '-01 00:00:00' );
+				break;
+		}
+
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE {$where}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	}
 
 	// -------------------------------------------------------------------------
@@ -538,7 +585,14 @@ class MeowPack_Stats {
 				);
 				break;
 			case 'chart':
-				$data = $this->get_last_n_days( $days );
+				$chart_data = $this->get_last_n_days( $days );
+				$data = array(
+					'chart'  => $chart_data,
+					'totals' => array(
+						'pv' => array_sum( array_column( $chart_data, 'total_views' ) ),
+						'uv' => array_sum( array_column( $chart_data, 'unique_visitors' ) ),
+					),
+				);
 				break;
 			case 'top_posts':
 				$data = $this->get_top_posts( $count, $period );

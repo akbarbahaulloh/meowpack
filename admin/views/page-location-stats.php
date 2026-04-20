@@ -13,14 +13,14 @@ $drill  = isset( $_GET['country'] ) ? sanitize_text_field( wp_unslash( $_GET['co
 
 switch ( $period ) {
 	case 'today':
-		$where_date = $wpdb->prepare( 'AND visit_date = %s', gmdate( 'Y-m-d' ) );
+		$where_date = $wpdb->prepare( 'AND visit_date = %s', current_time( 'Y-m-d' ) );
 		break;
 	case 'week':
-		$start      = gmdate( 'Y-m-d', strtotime( 'monday this week' ) );
-		$where_date = $wpdb->prepare( 'AND visit_date >= %s', $start );
+		$monday     = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+		$where_date = $wpdb->prepare( 'AND visit_date >= %s', $monday );
 		break;
 	case 'month':
-		$start      = gmdate( 'Y-m' ) . '-01';
+		$start      = current_time( 'Y-m' ) . '-01';
 		$where_date = $wpdb->prepare( 'AND visit_date >= %s', $start );
 		break;
 	default:
