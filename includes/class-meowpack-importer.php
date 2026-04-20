@@ -127,6 +127,12 @@ class MeowPack_Importer {
 				$map['views'] = 1;
 				$map['url']   = 2;
 				$is_headless  = true;
+			} elseif ( is_numeric( trim( $header[1] ) ) && empty( $header[2] ) ) {
+				// Referrer/Search Engine CSV: Source Name, Views
+				$map['title']    = 0;
+				$map['views']    = 1;
+				$map['referrer'] = 0;
+				$is_headless     = true;
 			} else {
 				$map['date']  = 0;
 				$map['views'] = 1;
@@ -137,9 +143,9 @@ class MeowPack_Importer {
 			}
 		}
 
-		if ( $map['date'] === -1 && $map['url'] === -1 ) {
+		if ( $map['date'] === -1 && $map['url'] === -1 && ! isset( $map['referrer'] ) ) {
 			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-			return array( 'success' => false, 'error' => 'Format file tidak dikenali. Butuh kolom Date/URL dan Views.' );
+			return array( 'success' => false, 'error' => 'Format file tidak dikenali.' );
 		}
 
 		// Rewind if headless so we don't miss the first row
@@ -167,6 +173,27 @@ class MeowPack_Importer {
 				continue;
 			}
 
+			// Referrer Format (No Date, No URL, Just String and Views)
+			if ( $map['date'] === -1 && isset( $map['referrer'] ) ) {
+				$title = strtolower( trim( $row[ $map['title'] ] ?? '' ) );
+				if ( ! $title ) {
+					$skipped++;
+					continue;
+				}
+
+				$source_col = 'source_referral';
+				if ( strpos( $title, 'mesin pencari' ) !== false || strpos( $title, 'google' ) !== false || strpos( $title, 'bing' ) !== false || strpos( $title, 'yahoo' ) !== false || strpos( $title, 'duckduckgo' ) !== false ) {
+					$source_col = 'source_search';
+				} elseif ( strpos( $title, 'facebook' ) !== false || strpos( $title, 'x' ) !== false || strpos( $title, 'twitter' ) !== false || strpos( $title, 'instagram' ) !== false ) {
+					$source_col = 'source_social';
+				}
+
+				// Import into sitewide baseline (1970)
+				$result = $this->upsert_daily_stat( '1970-01-01', 0, $views, $visitors, $source_col );
+				$result ? $imported++ : $skipped++;
+				continue;
+			}
+
 			// Top Posts Format (No Date, Has URL)
 			if ( $map['date'] === -1 && $map['url'] !== -1 ) {
 				$url = rtrim( $row[ $map['url'] ] ?? '', '/' );
@@ -175,12 +202,28 @@ class MeowPack_Importer {
 					continue;
 				}
 
-				// Try to find Post ID from URL
+				// Try to find Post ID from URL (Domain mismatch safe)
 				if ( $post_id === 0 ) {
-					$post_id = url_to_postid( $url );
-					// Check if it's homepage
-					if ( $post_id === 0 && $url === rtrim( home_url(), '/' ) ) {
-						$post_id = 0; // Sitewide
+					$parsed = wp_parse_url( $url );
+					$path   = $parsed['path'] ?? '/';
+					$local_url = home_url( $path );
+
+					if ( rtrim( $local_url, '/' ) === rtrim( home_url(), '/' ) ) {
+						$post_id = 0; // Homepage / Sitewide
+					} else {
+						$post_id = url_to_postid( $local_url );
+					}
+					
+					// Fallback to slug search if domain + path mapping failed
+					if ( $post_id === 0 && $path !== '/' ) {
+						$slug = trim( $path, '/' );
+						$slug_parts = explode( '/', $slug );
+						$last_slug = end( $slug_parts );
+						if ( $last_slug ) {
+							global $wpdb;
+							$found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_name = %s AND post_status = 'publish' LIMIT 1", $last_slug ) );
+							$post_id = absint( $found );
+						}
 					}
 				}
 
@@ -230,9 +273,10 @@ class MeowPack_Importer {
 	 * @param int    $post_id  Post ID (0 = sitewide).
 	 * @param int    $views    View count.
 	 * @param int    $visitors Unique visitor count (0 = estimate 75% of views).
+	 * @param string $source   Traffic source column (default 'source_direct').
 	 * @return bool True if inserted/updated, false if skipped.
 	 */
-	public function upsert_daily_stat( $date, $post_id, $views, $visitors = 0 ) {
+	public function upsert_daily_stat( $date, $post_id, $views, $visitors = 0, $source = 'source_direct' ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'meow_daily_stats';
 
@@ -247,7 +291,7 @@ class MeowPack_Importer {
 		// Check existence.
 		$existing = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
-				"SELECT id, total_views, unique_visitors FROM {$table} WHERE stat_date = %s AND post_id = %d",
+				"SELECT id, total_views, unique_visitors, {$source} FROM {$table} WHERE stat_date = %s AND post_id = %d",
 				$date, $post_id
 			),
 			ARRAY_A
@@ -255,20 +299,18 @@ class MeowPack_Importer {
 
 		if ( $existing ) {
 			$data = array();
-			if ( (int) $existing['total_views'] < $views )       $data['total_views'] = $views;
-			if ( (int) $existing['unique_visitors'] < $visitors ) $data['unique_visitors'] = $visitors;
+			$data['total_views']     = (int) $existing['total_views'] + $views;
+			$data['unique_visitors'] = (int) $existing['unique_visitors'] + $visitors;
+			$data[ $source ]         = (int) $existing[ $source ] + $views;
 
-			if ( ! empty( $data ) ) {
-				$wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-					$table,
-					$data,
-					array( 'id' => (int) $existing['id'] ),
-					array( '%d' ),
-					array( '%d' )
-				);
-				return true;
-			}
-			return false;
+			$wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$table,
+				$data,
+				array( 'id' => (int) $existing['id'] ),
+				array( '%d', '%d', '%d' ),
+				array( '%d' )
+			);
+			return true;
 		}
 
 		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -278,7 +320,7 @@ class MeowPack_Importer {
 				'post_id'         => $post_id,
 				'total_views'     => $views,
 				'unique_visitors' => $visitors,
-				'source_direct'   => $views,
+				$source           => $views,
 			),
 			array( '%s', '%d', '%d', '%d', '%d' )
 		);
