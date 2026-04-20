@@ -335,6 +335,7 @@ $s = function( $key, $default = '' ) {
 			runImport('csv', 0, 0);
 		});
 	});
+	</script>
 
 	<hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
 
