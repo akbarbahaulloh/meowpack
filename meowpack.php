@@ -93,7 +93,6 @@ function meowpack_load_files() {
 		'includes/class-meowpack-share-buttons.php',
 		'includes/class-meowpack-view-counter.php',
 		'includes/class-meowpack-widget.php',
-		'includes/class-meowpack-importer.php',
 		// v2.0.0 new modules.
 		'includes/class-meowpack-click-tracker.php',
 		'includes/class-meowpack-reading-time.php',

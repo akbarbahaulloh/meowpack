@@ -35,9 +35,6 @@ class MeowPack_Core {
 	/** @var MeowPack_ViewCounter */
 	public $view_counter;
 
-	/** @var MeowPack_Importer */
-	public $importer;
-
 	/** @var MeowPack_AI_Bot_Manager */
 	public $ai_bot_manager;
 
@@ -90,7 +87,6 @@ class MeowPack_Core {
 		$this->autoshare     = new MeowPack_AutoShare();
 		$this->share_buttons = new MeowPack_ShareButtons();
 		$this->view_counter  = new MeowPack_ViewCounter();
-		$this->importer      = new MeowPack_Importer();
 		$this->click_tracker = new MeowPack_Click_Tracker();
 		$this->reading_time  = new MeowPack_Reading_Time();
 		$this->anti_hotlink  = new MeowPack_Anti_Hotlink();
@@ -202,19 +198,6 @@ class MeowPack_Core {
 					'platform' => array( 'type' => 'string',  'sanitize_callback' => 'sanitize_text_field' ),
 					'nonce'    => array( 'type' => 'string',  'sanitize_callback' => 'sanitize_text_field' ),
 				),
-			)
-		);
-
-		// --- Importer AJAX via REST -------------------------------------------
-		register_rest_route(
-			'meowpack/v1',
-			'/import',
-			array(
-				'methods'             => 'POST',
-				'callback'            => array( $this->importer, 'handle_import_request' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' );
-				},
 			)
 		);
 	}
