@@ -46,10 +46,22 @@ class MeowPack_Importer {
 					$data = $this->fetch_jetpack_api( 'stats/visits', array( 'unit' => 'day', 'quantity' => 30 ) );
 					break;
 				case 1:
-					$data = $this->fetch_jetpack_api( 'stats/post-views', array( 'date' => 'all', 'max' => 100 ) );
+					$data = $this->fetch_jetpack_api( 'stats/top-posts', array( 'period' => 'all', 'max' => 50 ) );
 					break;
 				case 2:
-					$data = $this->fetch_jetpack_api( 'stats/referrers', array( 'date' => 'all', 'max' => 50 ) );
+					$data = $this->fetch_jetpack_api( 'stats/referrers', array( 'period' => 'all', 'max' => 50 ) );
+					break;
+				case 3:
+					$data = $this->fetch_jetpack_api( 'stats/country-views', array( 'period' => 'all' ) );
+					break;
+				case 4:
+					$data = $this->fetch_jetpack_api( 'stats/search-terms', array( 'period' => 'all' ) );
+					break;
+				case 5:
+					$data = $this->fetch_jetpack_api( 'stats/clicks', array( 'period' => 'all' ) );
+					break;
+				case 6:
+					$data = $this->fetch_jetpack_api( 'stats/post-views', array( 'period' => 'month' ) );
 					break;
 			}
 			return new WP_REST_Response( array( 'success' => true, 'preview' => wp_json_encode( $data, JSON_PRETTY_PRINT ) ), 200 );

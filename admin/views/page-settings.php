@@ -247,8 +247,12 @@ $s = function( $key, $default = '' ) {
 
 					<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
 						<button type="button" class="button btn-api-preview" data-step="0"><?php esc_html_e( '👁️ P1. Kunjungan Harian', 'meowpack' ); ?></button>
-						<button type="button" class="button btn-api-preview" data-step="1"><?php esc_html_e( '👁️ P2. Artikel Terpopuler', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="1"><?php esc_html_e( '👁️ P2. Artikel (top-posts)', 'meowpack' ); ?></button>
 						<button type="button" class="button btn-api-preview" data-step="2"><?php esc_html_e( '👁️ P3. Sumber Referrer', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="3"><?php esc_html_e( '👁️ P4. Negara', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="4"><?php esc_html_e( '👁️ P5. Kata Kunci', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="5"><?php esc_html_e( '👁️ P6. Klik Keluar', 'meowpack' ); ?></button>
+						<button type="button" class="button btn-api-preview" data-step="6"><?php esc_html_e( '👁️ P7. Artikel (post-views)', 'meowpack' ); ?></button>
 					</div>
 
 					<div id="meowpack-api-preview-box" style="display:none; margin-bottom:15px;">
