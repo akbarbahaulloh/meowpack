@@ -102,6 +102,8 @@ class MeowPack_Importer {
 			'views'    => -1,
 			'visitors' => -1,
 			'post_id'  => -1,
+			'title'    => -1,
+			'url'      => -1,
 		);
 
 		foreach ( $header as $idx => $col ) {
@@ -112,17 +114,37 @@ class MeowPack_Importer {
 			if ( strpos( $col, 'visit' ) !== false )     $map['visitors'] = $idx;
 			if ( strpos( $col, 'post id' ) !== false )   $map['post_id']  = $idx;
 			if ( strpos( $col, 'article id' ) !== false )$map['post_id']  = $idx;
+			if ( strpos( $col, 'url' ) !== false )       $map['url']      = $idx;
 		}
+
+		$is_headless = false;
 
 		// Fallback for simple date,views format if no headers match.
-		if ( $map['date'] === -1 && count( $header ) >= 2 ) {
-			$map['date']  = 0;
-			$map['views'] = 1;
+		if ( $map['date'] === -1 && $map['views'] === -1 && count( $header ) >= 2 ) {
+			// Check if it's the "Top Posts" headless CSV: Title, Views, URL
+			if ( is_numeric( trim( $header[1] ) ) && filter_var( trim( $header[2] ?? '' ), FILTER_VALIDATE_URL ) ) {
+				$map['title'] = 0;
+				$map['views'] = 1;
+				$map['url']   = 2;
+				$is_headless  = true;
+			} else {
+				$map['date']  = 0;
+				$map['views'] = 1;
+				// If first item is a valid date, it's a headless Date,Views CSV
+				if ( strtotime( trim( $header[0] ) ) ) {
+					$is_headless = true;
+				}
+			}
 		}
 
-		if ( $map['date'] === -1 || $map['views'] === -1 ) {
+		if ( $map['date'] === -1 && $map['url'] === -1 ) {
 			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
-			return array( 'success' => false, 'error' => 'Kolom "Date" atau "Views" tidak ditemukan di CSV.' );
+			return array( 'success' => false, 'error' => 'Format file tidak dikenali. Butuh kolom Date/URL dan Views.' );
+		}
+
+		// Rewind if headless so we don't miss the first row
+		if ( $is_headless ) {
+			rewind( $handle );
 		}
 
 		// 2. Skip to offset.
@@ -135,27 +157,60 @@ class MeowPack_Importer {
 		while ( $read < $limit && ( $row = fgetcsv( $handle ) ) !== false ) {
 			$read++;
 
-			$date_raw = $row[ $map['date'] ] ?? '';
 			$views    = absint( $row[ $map['views'] ] ?? 0 );
-			$post_id  = $map['post_id'] !== -1 ? absint( $row[ $map['post_id'] ] ?? 0 ) : 0;
 			$visitors = $map['visitors'] !== -1 ? absint( $row[ $map['visitors'] ] ?? 0 ) : 0;
+			$post_id  = $map['post_id'] !== -1 ? absint( $row[ $map['post_id'] ] ?? 0 ) : 0;
+			$date     = '';
 
-			if ( empty( $date_raw ) || $views <= 0 ) {
+			if ( $views <= 0 ) {
 				$skipped++;
 				continue;
 			}
 
-			// Flexible date parsing.
-			$timestamp = strtotime( $date_raw );
-			if ( ! $timestamp ) {
-				$skipped++;
-				continue;
+			// Top Posts Format (No Date, Has URL)
+			if ( $map['date'] === -1 && $map['url'] !== -1 ) {
+				$url = rtrim( $row[ $map['url'] ] ?? '', '/' );
+				if ( ! $url ) {
+					$skipped++;
+					continue;
+				}
+
+				// Try to find Post ID from URL
+				if ( $post_id === 0 ) {
+					$post_id = url_to_postid( $url );
+					// Check if it's homepage
+					if ( $post_id === 0 && $url === rtrim( home_url(), '/' ) ) {
+						$post_id = 0; // Sitewide
+					}
+				}
+
+				// Fallback date: Use post's publish date, or '1970-01-01' for All-Time sum
+				$date = '1970-01-01';
+				if ( $post_id > 0 ) {
+					$post = get_post( $post_id );
+					if ( $post ) {
+						$date = gmdate( 'Y-m-d', strtotime( $post->post_date ) );
+					}
+				}
+			} else {
+				// Standard Jetpack Format with Date
+				$date_raw = $row[ $map['date'] ] ?? '';
+				if ( empty( $date_raw ) ) {
+					$skipped++;
+					continue;
+				}
+				$timestamp = strtotime( $date_raw );
+				if ( ! $timestamp ) {
+					$skipped++;
+					continue;
+				}
+				$date = date( 'Y-m-d', $timestamp );
 			}
-			$date = date( 'Y-m-d', $timestamp );
 
 			$result = $this->upsert_daily_stat( $date, $post_id, $views, $visitors );
 			$result ? $imported++ : $skipped++;
 		}
+
 
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
