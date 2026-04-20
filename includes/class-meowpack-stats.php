@@ -125,14 +125,10 @@ class MeowPack_Stats {
 	 * Delete all cached stat transients.
 	 */
 	public function flush_stat_caches() {
-		$keys = array(
-			'meowpack_stats_today', 'meowpack_stats_week', 'meowpack_stats_month',
-			'meowpack_stats_alltime', 'meowpack_stats_30days', 'meowpack_top_posts',
-			'meowpack_source_breakdown',
-		);
-		foreach ( $keys as $key ) {
-			delete_transient( $key );
-		}
+		global $wpdb;
+		// Delete all MeowPack transients (wildcard) since they have dynamic names based on periods/post_ids.
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_meowpack\_%'" );
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_timeout\_meowpack\_%'" );
 	}
 
 	// -------------------------------------------------------------------------
