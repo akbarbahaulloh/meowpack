@@ -240,9 +240,9 @@ class MeowPack_Popular_Widget extends WP_Widget {
 		// Fetch popular posts using MeowPack's tracking data
 		global $wpdb;
 		$results = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			"SELECT post_id, SUM(views) as total_views 
+			"SELECT post_id, SUM(total_views) as total_views 
 			 FROM {$wpdb->prefix}meow_daily_stats 
-			 WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
+			 WHERE stat_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
 			 GROUP BY post_id 
 			 ORDER BY total_views DESC 
 			 LIMIT %d",

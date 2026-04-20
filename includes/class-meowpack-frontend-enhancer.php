@@ -75,7 +75,7 @@ class MeowPack_Frontend_Enhancer {
 		// Get views from DB
 		global $wpdb;
 		$views = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			"SELECT SUM(views) FROM {$wpdb->prefix}meow_daily_stats WHERE post_id = %d",
+			"SELECT SUM(total_views) FROM {$wpdb->prefix}meow_daily_stats WHERE post_id = %d",
 			$post_id
 		) );
 
