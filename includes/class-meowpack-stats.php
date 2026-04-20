@@ -167,35 +167,38 @@ class MeowPack_Stats {
 				$start = current_time( 'Y-m' ) . '-01';
 				$where = $wpdb->prepare( 'stat_date >= %s', $start );
 				break;
+			case 'year':
+				$start = current_time( 'Y' ) . '-01-01';
+				$where = $wpdb->prepare( 'stat_date >= %s', $start );
+				break;
 			default: // alltime.
 				$where = '1=1';
 		}
 
-		// For today, query the raw visits table for real-time accuracy.
-		if ( 'today' === $period ) {
-			$visits_table = $wpdb->prefix . 'meow_visits';
-			$today        = current_time( 'Y-m-d' );
-			$row          = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				$wpdb->prepare(
-					"SELECT COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(*) AS total_views
-					 FROM {$visits_table}
-					 WHERE visit_date = %s AND is_bot = 0 AND post_id > 0",
-					$today
-				),
-				ARRAY_A
-			);
-		} else {
-			$row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				"SELECT SUM(unique_visitors) AS unique_visitors, SUM(total_views) AS total_views
-				 FROM {$stats_table}
-				 WHERE post_id = 0 AND {$where}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				ARRAY_A
-			);
-		}
+		// Always fetch today's real-time raw visits
+		$visits_table = $wpdb->prefix . 'meow_visits';
+		$today        = current_time( 'Y-m-d' );
+		$row_today    = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(*) AS total_views
+				 FROM {$visits_table}
+				 WHERE visit_date = %s AND is_bot = 0 AND post_id > 0",
+				$today
+			),
+			ARRAY_A
+		);
+
+		// Fetch aggregated historical visits
+		$row_agg = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT SUM(unique_visitors) AS unique_visitors, SUM(total_views) AS total_views
+			 FROM {$stats_table}
+			 WHERE post_id = 0 AND {$where}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
 
 		$result = array(
-			'unique_visitors' => (int) ( $row['unique_visitors'] ?? 0 ),
-			'total_views'     => (int) ( $row['total_views'] ?? 0 ),
+			'unique_visitors' => (int) ( $row_today['unique_visitors'] ?? 0 ) + (int) ( $row_agg['unique_visitors'] ?? 0 ),
+			'total_views'     => (int) ( $row_today['total_views'] ?? 0 ) + (int) ( $row_agg['total_views'] ?? 0 ),
 		);
 
 		$ttl = ( 'today' === $period ) ? 300 : HOUR_IN_SECONDS;
@@ -410,18 +413,33 @@ class MeowPack_Stats {
 				$start = current_time( 'Y-m' ) . '-01';
 				$where = $wpdb->prepare( ' AND stat_date >= %s', $start );
 				break;
+			case 'this_year':
+				$start = current_time( 'Y' ) . '-01-01';
+				$where = $wpdb->prepare( ' AND stat_date >= %s', $start );
+				break;
 			default:
 				$where = '';
 		}
 
-		$views = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$visits_table = $wpdb->prefix . 'meow_visits';
+		$today        = current_time( 'Y-m-d' );
+
+		$views_today = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$visits_table} WHERE visit_date = %s AND is_bot = 0 AND post_id = %d",
+				$today,
+				$post_id
+			)
+		);
+
+		$views_agg = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT SUM(total_views) FROM {$stats_table} WHERE post_id = %d" . $where, // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				$post_id
 			)
 		);
 
-		$views = (int) ( $views ?? 0 );
+		$views = $views_today + $views_agg;
 		set_transient( $cache_key, $views, HOUR_IN_SECONDS );
 
 		return $views;

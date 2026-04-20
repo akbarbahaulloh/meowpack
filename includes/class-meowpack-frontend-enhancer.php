@@ -72,12 +72,8 @@ class MeowPack_Frontend_Enhancer {
 	 * Build the Post Meta Bar (Views + Estimated Reading Time).
 	 */
 	private function build_post_meta_html( $content, $post_id ) {
-		// Get views from DB
-		global $wpdb;
-		$views = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			"SELECT SUM(total_views) FROM {$wpdb->prefix}meow_daily_stats WHERE post_id = %d",
-			$post_id
-		) );
+		// Get real-time views from stats engine
+		$views = MeowPack_Core::get_instance()->stats->get_post_views( $post_id );
 
 		// Calculate WPM
 		$word_count = str_word_count( wp_strip_all_tags( $content ) );

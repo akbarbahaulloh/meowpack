@@ -31,7 +31,8 @@ class MeowPack_Reading_Time {
 			return;
 		}
 
-		add_filter( 'the_content', array( $this, 'prepend_reading_time' ) );
+		// Removed auto-injection via the_content filter to avoid duplicates
+		// with the new Frontend Enhancer module.
 		add_shortcode( 'meowpack_reading_time', array( $this, 'shortcode' ) );
 	}
 

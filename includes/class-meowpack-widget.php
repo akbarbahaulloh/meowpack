@@ -67,6 +67,7 @@ class MeowPack_Stats_Widget extends WP_Widget {
 		$type_options = array(
 			'today'     => __( 'Pengunjung Hari Ini', 'meowpack' ),
 			'month'     => __( 'Pengunjung Bulan Ini', 'meowpack' ),
+			'year'      => __( 'Pengunjung Tahun Ini', 'meowpack' ),
 			'total'     => __( 'Total Pengunjung', 'meowpack' ),
 			'pageviews' => __( 'Total Halaman Dibaca', 'meowpack' ),
 		);
@@ -105,7 +106,7 @@ class MeowPack_Stats_Widget extends WP_Widget {
 	public function update( $new_instance, $old_instance ) {
 		$instance               = array();
 		$instance['title']      = sanitize_text_field( $new_instance['title'] ?? '' );
-		$allowed_types          = array( 'today', 'month', 'total', 'pageviews' );
+		$allowed_types          = array( 'today', 'month', 'year', 'total', 'pageviews' );
 		$selected               = array_intersect( (array) ( $new_instance['show_types'] ?? array() ), $allowed_types );
 		$instance['show_types'] = $selected;
 		return $instance;
@@ -127,6 +128,7 @@ class MeowPack_Stats_Widget extends WP_Widget {
 		$stats  = MeowPack_Core::get_instance()->stats;
 		$today  = $stats->get_sitewide_stats( 'today' );
 		$month  = $stats->get_sitewide_stats( 'month' );
+		$year   = $stats->get_sitewide_stats( 'year' );
 		$alltime= $stats->get_sitewide_stats( 'alltime' );
 
 		$data = array(
@@ -139,6 +141,11 @@ class MeowPack_Stats_Widget extends WP_Widget {
 				'value' => $month['unique_visitors'],
 				'label' => __( 'Pengunjung Bulan Ini', 'meowpack' ),
 				'icon'  => '📅',
+			),
+			'year'      => array(
+				'value' => $year['unique_visitors'],
+				'label' => __( 'Pengunjung Tahun Ini', 'meowpack' ),
+				'icon'  => '📆',
 			),
 			'total'     => array(
 				'value' => $alltime['unique_visitors'],
@@ -154,7 +161,7 @@ class MeowPack_Stats_Widget extends WP_Widget {
 
 		$types = (array) $types;
 		if ( in_array( 'all', $types, true ) ) {
-			$types = array( 'today', 'month', 'total', 'pageviews' );
+			$types = array( 'today', 'month', 'year', 'total', 'pageviews' );
 		}
 
 		$html = '<div class="meowpack-counter-grid">';
@@ -200,7 +207,7 @@ class MeowPack_Stats_Widget extends WP_Widget {
 		);
 
 		$type  = sanitize_text_field( $atts['type'] );
-		$types = ( 'all' === $type ) ? array( 'today', 'month', 'total', 'pageviews' ) : explode( ',', $type );
+		$types = ( 'all' === $type ) ? array( 'today', 'month', 'year', 'total', 'pageviews' ) : explode( ',', $type );
 		$types = array_map( 'trim', $types );
 
 		// Enqueue CSS if not already done.

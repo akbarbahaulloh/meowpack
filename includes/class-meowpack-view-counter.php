@@ -25,7 +25,8 @@ class MeowPack_ViewCounter {
 			return;
 		}
 
-		add_filter( 'the_content', array( $this, 'inject_view_count' ) );
+		// Removed auto-injection via the_content filter to avoid duplicates
+		// with the new Frontend Enhancer module.
 		add_shortcode( 'meowpack_views', array( $this, 'shortcode_views' ) );
 		add_shortcode( 'meowpack_trending', array( $this, 'shortcode_trending' ) );
 	}
