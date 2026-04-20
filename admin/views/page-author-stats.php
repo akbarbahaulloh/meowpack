@@ -6,131 +6,86 @@
  */
 defined( 'ABSPATH' ) || exit;
 
-global $wpdb;
-$visits_table = $wpdb->prefix . 'meow_visits';
-$period       = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'today';
+$stats  = MeowPack_Core::get_instance()->stats;
+$period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'today';
 
-switch ( $period ) {
-	case 'today':
-		$where = $wpdb->prepare( 'AND visit_date = %s', current_time( 'Y-m-d' ) );
-		break;
-	case 'week':
-		$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
-		$where = $wpdb->prepare( 'AND visit_date >= %s', $monday );
-		break;
-	case 'month':
-		$start = current_time( 'Y-m' ) . '-01';
-		$where = $wpdb->prepare( 'AND visit_date >= %s', $start );
-		break;
-	default:
-		$where = '';
-}
-
-// Author stats from raw visits.
-$author_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	"SELECT author_id,
-	        COUNT(*) AS total_views,
-	        COUNT(DISTINCT ip_hash) AS unique_visitors,
-	        COUNT(DISTINCT post_id) AS post_count
-	 FROM {$visits_table}
-	 WHERE is_bot = 0 AND author_id > 0 {$where}
-	 GROUP BY author_id
-	 ORDER BY total_views DESC
-	 LIMIT 25",
-	ARRAY_A
-);
+$author_rows = $stats->get_author_stats( $period );
 
 $period_tabs = array(
-	'today'   => __( 'Hari Ini', 'meowpack' ),
-	'week'    => __( 'Minggu Ini', 'meowpack' ),
-	'month'   => __( 'Bulan Ini', 'meowpack' ),
-	'alltime' => __( 'Semua Waktu', 'meowpack' ),
+	'today'      => __( 'Hari Ini', 'meowpack' ),
+	'this_week'  => __( 'Minggu Ini', 'meowpack' ),
+	'this_month' => __( 'Bulan Ini', 'meowpack' ),
+	'this_year'  => __( 'Tahun Ini', 'meowpack' ),
+	'alltime'    => __( 'Semua Waktu', 'meowpack' ),
 );
-
-// Top post per author lookup.
-$top_post_by_author = array();
-if ( ! empty( $author_rows ) ) {
-	$author_ids = implode( ',', array_map( 'absint', array_column( $author_rows, 'author_id' ) ) );
-	$top_posts  = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		"SELECT author_id, post_id, COUNT(*) AS views
-		 FROM {$visits_table}
-		 WHERE is_bot = 0 AND author_id IN ({$author_ids}) {$where}
-		 GROUP BY author_id, post_id
-		 ORDER BY author_id, views DESC",
-		ARRAY_A
-	);
-
-	$seen_authors = array();
-	foreach ( (array) $top_posts as $row ) {
-		$aid = (int) $row['author_id'];
-		if ( ! isset( $seen_authors[ $aid ] ) ) {
-			$top_post_by_author[ $aid ] = $row;
-			$seen_authors[ $aid ]       = true;
-		}
-	}
-}
 ?>
-<div>
-
-	<!-- Period tabs -->
-	<div style="margin-bottom:20px;">
-		<?php foreach ( $period_tabs as $key => $label ) : ?>
-			<a href="?page=meowpack&tab=author&period=<?php echo esc_attr( $key ); ?>"
-			   class="button <?php echo $key === $period ? 'button-primary' : ''; ?>"
-			   style="margin-right:6px;"><?php echo esc_html( $label ); ?></a>
-		<?php endforeach; ?>
+<div class="meowpack-section">
+	<div class="meowpack-section__header">
+		<h2>✍️ <?php esc_html_e( 'Statistik Penulis', 'meowpack' ); ?></h2>
+		<div class="meowpack-period-selector">
+			<?php foreach ( $period_tabs as $key => $label ) : ?>
+				<a href="<?php echo esc_url( add_query_arg( 'period', $key ) ); ?>" 
+				   class="button <?php echo $period === $key ? 'button-primary' : ''; ?>">
+					<?php echo esc_html( $label ); ?>
+				</a>
+			<?php endforeach; ?>
+		</div>
 	</div>
 
 	<?php if ( empty( $author_rows ) ) : ?>
-		<div class="meowpack-notice"><?php esc_html_e( 'Belum ada data author untuk periode ini.', 'meowpack' ); ?></div>
+		<p class="meowpack-empty"><?php esc_html_e( 'Belum ada data penulis untuk periode ini.', 'meowpack' ); ?></p>
 	<?php else : ?>
-	<table class="widefat striped meowpack-table">
-		<thead>
-			<tr>
-				<th>#</th>
-				<th><?php esc_html_e( 'Penulis', 'meowpack' ); ?></th>
-				<th><?php esc_html_e( 'Total Views', 'meowpack' ); ?></th>
-				<th><?php esc_html_e( 'Pengunjung Unik', 'meowpack' ); ?></th>
-				<th><?php esc_html_e( 'Jumlah Artikel', 'meowpack' ); ?></th>
-				<th><?php esc_html_e( 'Artikel Terpopuler', 'meowpack' ); ?></th>
-			</tr>
-		</thead>
-		<tbody>
-			<?php foreach ( $author_rows as $i => $row ) :
-				$author_id   = absint( $row['author_id'] );
-				$author      = get_userdata( $author_id );
-				$author_name = $author ? esc_html( $author->display_name ) : '#' . $author_id;
-				$author_url  = $author ? get_author_posts_url( $author_id ) : '';
-
-				$top_post_row = $top_post_by_author[ $author_id ] ?? null;
-				$top_post_id  = $top_post_row ? absint( $top_post_row['post_id'] ) : 0;
-			?>
-			<tr>
-				<td><?php echo esc_html( $i + 1 ); ?></td>
-				<td>
-					<?php if ( $author ) : ?>
-						<?php echo get_avatar( $author_id, 32, '', $author_name, array( 'class' => 'avatar', 'style' => 'border-radius:50%;vertical-align:middle;margin-right:8px;' ) ); ?>
-						<a href="<?php echo esc_url( $author_url ); ?>" target="_blank"><?php echo $author_name; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></a>
-					<?php else : ?>
-						<?php echo esc_html( $author_name ); ?>
-					<?php endif; ?>
-				</td>
-				<td><strong><?php echo esc_html( number_format_i18n( (int) $row['total_views'] ) ); ?></strong></td>
-				<td><?php echo esc_html( number_format_i18n( (int) $row['unique_visitors'] ) ); ?></td>
-				<td><?php echo esc_html( number_format_i18n( (int) $row['post_count'] ) ); ?></td>
-				<td>
-					<?php if ( $top_post_id ) : ?>
-						<a href="<?php echo esc_url( get_permalink( $top_post_id ) ); ?>" target="_blank">
-							<?php echo esc_html( get_the_title( $top_post_id ) ?: '#' . $top_post_id ); ?>
-						</a>
-						<small style="color:#6c7086;">(<?php echo esc_html( number_format_i18n( (int) $top_post_row['views'] ) ); ?> views)</small>
-					<?php else : ?>
-						—
-					<?php endif; ?>
-				</td>
-			</tr>
-			<?php endforeach; ?>
-		</tbody>
-	</table>
+		<table class="widefat striped meowpack-table" style="margin-top:20px;">
+			<thead>
+				<tr>
+					<th>#</th>
+					<th><?php esc_html_e( 'Penulis', 'meowpack' ); ?></th>
+					<th><?php esc_html_e( 'Total Tampilan', 'meowpack' ); ?></th>
+					<th><?php esc_html_e( 'Pengunjung Unik', 'meowpack' ); ?></th>
+					<th><?php esc_html_e( 'Jumlah Artikel', 'meowpack' ); ?></th>
+					<th><?php esc_html_e( 'Artikel Terpopuler', 'meowpack' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $author_rows as $i => $row ) :
+					$author_id   = absint( $row['author_id'] );
+					$author      = get_userdata( $author_id );
+					$author_name = $author ? esc_html( $author->display_name ) : '#' . $author_id;
+					$author_url  = $author ? get_author_posts_url( $author_id ) : '';
+					
+					// Fetch top post live (not cached for high precision here).
+					$top_post = $stats->get_top_post_for_author( $author_id, $period );
+				?>
+				<tr>
+					<td><?php echo esc_html( $i + 1 ); ?></td>
+					<td>
+						<?php if ( $author ) : ?>
+							<div style="display:flex; align-items:center; gap:10px;">
+								<?php echo get_avatar( $author_id, 32, '', $author_name, array( 'style' => 'border-radius:50%;' ) ); ?>
+								<a href="<?php echo esc_url( $author_url ); ?>" target="_blank" style="font-weight:600;">
+									<?php echo $author_name; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+								</a>
+							</div>
+						<?php else : ?>
+							<?php echo esc_html( $author_name ); ?>
+						<?php endif; ?>
+					</td>
+					<td><strong><?php echo esc_html( MeowPack_ViewCounter::format_number( $row['views'] ) ); ?></strong></td>
+					<td><?php echo esc_html( MeowPack_ViewCounter::format_number( $row['unique_visitors'] ) ); ?></td>
+					<td><?php echo esc_html( MeowPack_ViewCounter::format_number( $row['post_count'] ) ); ?></td>
+					<td>
+						<?php if ( ! empty( $top_post ) ) : ?>
+							<a href="<?php echo esc_url( get_permalink( $top_post['post_id'] ) ); ?>" target="_blank">
+								<?php echo esc_html( get_the_title( $top_post['post_id'] ) ?: '#' . $top_post['post_id'] ); ?>
+							</a>
+							<span style="color:#64748b; font-size:12px;">(<?php echo esc_html( MeowPack_ViewCounter::format_number( $top_post['views'] ) ); ?> views)</span>
+						<?php else : ?>
+							—
+						<?php endif; ?>
+					</td>
+				</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
 	<?php endif; ?>
 </div>

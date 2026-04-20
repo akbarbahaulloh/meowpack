@@ -34,7 +34,7 @@ class MeowPack_Stats {
 	 * Called by the daily cron.
 	 */
 	public function aggregate_yesterday() {
-		$yesterday = gmdate( 'Y-m-d', strtotime( '-1 day' ) );
+		$yesterday = date( 'Y-m-d', strtotime( '-1 day', current_time( 'timestamp' ) ) );
 		$this->aggregate_for_date( $yesterday );
 	}
 
@@ -114,7 +114,7 @@ class MeowPack_Stats {
 	public function purge_old_visits( $days = 30 ) {
 		global $wpdb;
 		$table    = $wpdb->prefix . 'meow_visits';
-		$cutoff   = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+		$cutoff   = date( 'Y-m-d', strtotime( "-{$days} days", current_time( 'timestamp' ) ) );
 
 		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare( "DELETE FROM {$table} WHERE visit_date < %s", $cutoff )
@@ -149,56 +149,79 @@ class MeowPack_Stats {
 		}
 
 		global $wpdb;
-		$stats_table = $wpdb->prefix . 'meow_daily_stats';
+		$stats_table  = $wpdb->prefix . 'meow_daily_stats';
+		$visits_table = $wpdb->prefix . 'meow_visits';
 
+		// 1. Determine the range for historical aggregated data.
 		switch ( $period ) {
 			case 'today':
-				$where = $wpdb->prepare( 'stat_date = %s', current_time( 'Y-m-d' ) );
+				$where_agg = '1=0'; // No aggregate for today yet.
 				break;
 			case 'week':
-				// Monday of this week in site's timezone.
-				$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
-				$where = $wpdb->prepare( 'stat_date >= %s', $monday );
+				$monday    = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+				$where_agg = $wpdb->prepare( 'stat_date >= %s', $monday );
 				break;
 			case 'month':
-				$start = current_time( 'Y-m' ) . '-01';
-				$where = $wpdb->prepare( 'stat_date >= %s', $start );
+				$start     = current_time( 'Y-m' ) . '-01';
+				$where_agg = $wpdb->prepare( 'stat_date >= %s', $start );
 				break;
 			case 'year':
-				$start = current_time( 'Y' ) . '-01-01';
-				$where = $wpdb->prepare( 'stat_date >= %s', $start );
+				$start     = current_time( 'Y' ) . '-01-01';
+				$where_agg = $wpdb->prepare( 'stat_date >= %s', $start );
 				break;
 			default: // alltime.
-				$where = '1=1';
+				$where_agg = '1=1';
 		}
 
-		// Real-time component (Today's raw visits)
-		$visits_table = $wpdb->prefix . 'meow_visits';
-		$today        = current_time( 'Y-m-d' );
-		$row_today    = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		// 2. Fetch the LATEST aggregated date to know where history ends.
+		$last_agg_date = $wpdb->get_var( "SELECT MAX(stat_date) FROM {$stats_table}" );
+		if ( ! $last_agg_date ) {
+			$last_agg_date = '0000-00-00';
+		}
+
+		// 3. Historical data from stats table.
+		$row_agg = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT SUM(unique_visitors) AS unique_visitors, SUM(total_views) AS total_views
+			 FROM {$stats_table}
+			 WHERE post_id = 0 AND {$where_agg}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+
+		// 4. Determine range for raw data (Anything NOT in aggregated data).
+		// We fetch raw data for the requested period but ONLY for dates > last_agg_date.
+		$where_raw_period = '1=1';
+		switch ( $period ) {
+			case 'today':
+				$where_raw_period = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) );
+				break;
+			case 'week':
+				$where_raw_period = $wpdb->prepare( 'visit_date >= %s', $monday );
+				break;
+			case 'month':
+				$where_raw_period = $wpdb->prepare( 'visit_date >= %s', $start );
+				break;
+			case 'year':
+				$where_raw_period = $wpdb->prepare( 'visit_date >= %s', $start );
+				break;
+		}
+
+		// Combined where: date in period AND date > last_agg_date.
+		$row_raw = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(*) AS total_views
 				 FROM {$visits_table}
-				 WHERE visit_date = %s AND is_bot = 0",
-				$today
+				 WHERE is_bot = 0 AND {$where_raw_period} AND visit_date > %s",
+				$last_agg_date
 			),
 			ARRAY_A
 		);
 
-		// Aggregated component (Historical statistics)
-		$row_agg = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			"SELECT SUM(unique_visitors) AS unique_visitors, SUM(total_views) AS total_views
-			 FROM {$stats_table}
-			 WHERE post_id = 0 AND {$where}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			ARRAY_A
-		);
-
 		$result = array(
-			'unique_visitors' => (int) ( $row_today['unique_visitors'] ?? 0 ) + (int) ( $row_agg['unique_visitors'] ?? 0 ),
-			'total_views'     => (int) ( $row_today['total_views'] ?? 0 ) + (int) ( $row_agg['total_views'] ?? 0 ),
+			'unique_visitors' => (int) ( $row_agg['unique_visitors'] ?? 0 ) + (int) ( $row_raw['unique_visitors'] ?? 0 ),
+			'total_views'     => (int) ( $row_agg['total_views'] ?? 0 ) + (int) ( $row_raw['total_views'] ?? 0 ),
 		);
 
-		$ttl = ( 'today' === $period ) ? 60 : 300; // Shorter cache for live stats
+		$ttl = ( 'today' === $period ) ? 60 : 300;
 		set_transient( $cache_key, $result, $ttl );
 
 		return $result;
@@ -218,26 +241,48 @@ class MeowPack_Stats {
 		}
 
 		global $wpdb;
-		$stats_table = $wpdb->prefix . 'meow_daily_stats';
+		$stats_table  = $wpdb->prefix . 'meow_daily_stats';
 		$visits_table = $wpdb->prefix . 'meow_visits';
-		$now_ts      = current_time( 'timestamp' );
-		$start       = date( 'Y-m-d', strtotime( "-{$days} days", $now_ts ) );
+		
+		// Use a very reliable "today" definition.
+		$today_date   = current_time( 'Y-m-d' );
+		$now_ts       = strtotime( $today_date ); // Mid-night start of today.
+		$start_date   = date( 'Y-m-d', strtotime( "-{$days} days", $now_ts + 43200 ) ); // +12h for safety in math.
 
+		// 1. Fetch Aggregated Data
 		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT stat_date AS date, unique_visitors, total_views
 				 FROM {$stats_table}
 				 WHERE post_id = 0 AND stat_date >= %s
 				 ORDER BY stat_date ASC",
-				$start
+				$start_date
 			),
 			ARRAY_A
 		);
 
-		// Fill missing dates with zeroes.
+		// 2. Fetch Raw Data for non-aggregated days (the last gap).
+		$last_agg_date = $wpdb->get_var( "SELECT MAX(stat_date) FROM {$stats_table}" );
+		if ( ! $last_agg_date ) {
+			$last_agg_date = '0000-00-00';
+		}
+
+		$raw_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT visit_date AS date, COUNT(DISTINCT ip_hash) AS uv, COUNT(*) AS pv
+				 FROM {$visits_table}
+				 WHERE is_bot = 0 AND visit_date > %s AND visit_date >= %s
+				 GROUP BY visit_date",
+				$last_agg_date,
+				$start_date
+			),
+			ARRAY_A
+		);
+
+		// Initialize results with 0s for the entire range.
 		$result = array();
 		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$date = date( 'Y-m-d', strtotime( "-{$i} days", $now_ts ) );
+			$date = date( 'Y-m-d', strtotime( "-{$i} days", $now_ts + 43200 ) );
 			$result[ $date ] = array(
 				'date'             => $date,
 				'unique_visitors'  => 0,
@@ -245,6 +290,7 @@ class MeowPack_Stats {
 			);
 		}
 
+		// Fill in Aggregated
 		foreach ( $rows as $row ) {
 			if ( isset( $result[ $row['date'] ] ) ) {
 				$result[ $row['date'] ]['unique_visitors'] = (int) $row['unique_visitors'];
@@ -252,20 +298,12 @@ class MeowPack_Stats {
 			}
 		}
 
-		// Inject today's real-time data into the last point
-		$today     = current_time( 'Y-m-d' );
-		$row_today = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT ip_hash) AS uv, COUNT(*) AS pv 
-				 FROM {$visits_table} WHERE visit_date = %s AND is_bot = 0",
-				$today
-			),
-			ARRAY_A
-		);
-
-		if ( isset( $result[ $today ] ) ) {
-			$result[ $today ]['unique_visitors'] += (int) ( $row_today['uv'] ?? 0 );
-			$result[ $today ]['total_views']     += (int) ( $row_today['pv'] ?? 0 );
+		// Fill in Raw (The bridge)
+		foreach ( $raw_rows as $row ) {
+			if ( isset( $result[ $row['date'] ] ) ) {
+				$result[ $row['date'] ]['unique_visitors'] += (int) $row['uv'];
+				$result[ $row['date'] ]['total_views']     += (int) $row['pv'];
+			}
 		}
 
 		$result = array_values( $result );
@@ -405,25 +443,39 @@ class MeowPack_Stats {
 				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
 				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
 				break;
+			case 'this_year':
+				$start       = current_time( 'Y' ) . '-01-01';
+				$where_agg   = $wpdb->prepare( 'stat_date >= %s', $start );
+				$where_today = $wpdb->prepare( 'visit_date >= %s', $start );
+				break;
 			default:
 				$where_agg   = '1=1';
 				$where_today = '1=1';
 		}
 
-		// Raw component
+		// Smart-Merge Logic: Find the gap between aggregated and raw data.
+		$last_agg_date = $wpdb->get_var( "SELECT MAX(stat_date) FROM {$stats_table}" );
+		if ( ! $last_agg_date ) {
+			$last_agg_date = '0000-00-00';
+		}
+
+		// Raw component (Only for dates NOT in aggregated data)
 		$raw_row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			"SELECT
-				SUM(source_type = 'direct') AS direct,
-				SUM(source_type = 'search') AS search,
-				SUM(source_type = 'social') AS social,
-				SUM(source_type = 'referral') AS referral,
-				SUM(source_type = 'email') AS email
-			 FROM {$visits_table}
-			 WHERE is_bot = 0 AND {$where_today}",
+			$wpdb->prepare(
+				"SELECT
+					SUM(source_type = 'direct') AS direct,
+					SUM(source_type = 'search') AS search,
+					SUM(source_type = 'social') AS social,
+					SUM(source_type = 'referral') AS referral,
+					SUM(source_type = 'email') AS email
+				 FROM {$visits_table}
+				 WHERE is_bot = 0 AND {$where_today} AND visit_date > %s",
+				$last_agg_date
+			),
 			ARRAY_A
 		);
 
-		// Aggregated component
+		// Aggregated component (Historical)
 		$agg_row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			"SELECT
 				SUM(source_direct) AS direct,
@@ -472,8 +524,9 @@ class MeowPack_Stats {
 				$where = $wpdb->prepare( ' AND stat_date = %s', current_time( 'Y-m-d' ) );
 				break;
 			case 'this_week':
-				$start = gmdate( 'Y-m-d', strtotime( 'monday this week' ) );
-				$where = $wpdb->prepare( ' AND stat_date >= %s', $start );
+				$now_ts = current_time( 'timestamp' );
+				$monday = date( 'Y-m-d', strtotime( 'monday this week', $now_ts ) );
+				$where = $wpdb->prepare( ' AND stat_date >= %s', $monday );
 				break;
 			case 'this_month':
 				$start = current_time( 'Y-m' ) . '-01';
@@ -556,9 +609,135 @@ class MeowPack_Stats {
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE {$where}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	}
 
-	// -------------------------------------------------------------------------
-	// REST Handler
-	// -------------------------------------------------------------------------
+	/**
+	 * Get device type breakdown.
+	 */
+	public function get_device_stats( $period = 'today' ) {
+		return $this->get_generic_breakdown( $period, 'device_type', array( 'mobile', 'tablet', 'desktop' ) );
+	}
+
+	/**
+	 * Get browser breakdown.
+	 */
+	public function get_browser_stats( $period = 'today', $limit = 10 ) {
+		return $this->get_generic_breakdown( $period, 'browser', array(), $limit );
+	}
+
+	/**
+	 * Get OS breakdown.
+	 */
+	public function get_os_stats( $period = 'today', $limit = 10 ) {
+		return $this->get_generic_breakdown( $period, 'os', array(), $limit );
+	}
+
+	/**
+	 * Helper for generic breakdowns.
+	 */
+	private function get_generic_breakdown( $period, $field, $predefined_keys = array(), $limit = 15 ) {
+		$cache_key = 'meowpack_breakdown_' . $field . '_' . $period;
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached ) return $cached;
+
+		global $wpdb;
+		$stats_table  = $wpdb->prefix . 'meow_daily_stats';
+		$visits_table = $wpdb->prefix . 'meow_visits';
+
+		$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+		$month_start = current_time( 'Y-m' ) . '-01';
+		$year_start  = current_time( 'Y' ) . '-01-01';
+
+		switch ( $period ) {
+			case 'today':      $w_agg = '1=0'; $w_raw = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) ); break;
+			case 'this_week':  $w_agg = $wpdb->prepare( 'stat_date >= %s', $monday ); $w_raw = $wpdb->prepare( 'visit_date >= %s', $monday ); break;
+			case 'this_month': $w_agg = $wpdb->prepare( 'stat_date >= %s', $month_start ); $w_raw = $wpdb->prepare( 'visit_date >= %s', $month_start ); break;
+			case 'this_year':  $w_agg = $wpdb->prepare( 'stat_date >= %s', $year_start ); $w_raw = $wpdb->prepare( 'visit_date >= %s', $year_start ); break;
+			default:           $w_agg = '1=1'; $w_raw = '1=1';
+		}
+
+		$last_agg_date = $wpdb->get_var( "SELECT MAX(stat_date) FROM {$stats_table}" ) ?: '0000-00-00';
+
+		// Query Raw (for missing days)
+		$raw_rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT {$field} AS k, COUNT(*) AS v FROM {$visits_table} 
+			 WHERE is_bot = 0 AND {$w_raw} AND visit_date > %s AND {$field} IS NOT NULL 
+			 GROUP BY {$field} ORDER BY v DESC LIMIT %d",
+			$last_agg_date, $limit
+		), ARRAY_A );
+
+		$merged = array();
+		foreach($raw_rows as $r) { $merged[$r['k']] = (int)$r['v']; }
+
+		set_transient( $cache_key, $merged, 300 );
+		return $merged;
+	}
+
+	/**
+	 * Get top countries.
+	 */
+	public function get_country_stats( $period = 'today' ) {
+		$cache_key = 'meowpack_countries_' . $period;
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached ) return $cached;
+
+		global $wpdb;
+		$visits_table = $wpdb->prefix . 'meow_visits';
+
+		$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+		$month_start = current_time( 'Y-m' ) . '-01';
+		$year_start  = current_time( 'Y' ) . '-01-01';
+
+		switch ( $period ) {
+			case 'today':      $w_raw = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) ); break;
+			case 'this_week':  $w_raw = $wpdb->prepare( 'visit_date >= %s', $monday ); break;
+			case 'this_month': $w_raw = $wpdb->prepare( 'visit_date >= %s', $month_start ); break;
+			case 'this_year':  $w_raw = $wpdb->prepare( 'visit_date >= %s', $year_start ); break;
+			default:           $w_raw = '1=1';
+		}
+
+		$results = $wpdb->get_results(
+			"SELECT country_code, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS unique_visitors
+			 FROM {$visits_table} WHERE is_bot = 0 AND {$w_raw} AND country_code IS NOT NULL AND country_code != ''
+			 GROUP BY country_code ORDER BY views DESC LIMIT 30",
+			ARRAY_A
+		);
+
+		set_transient( $cache_key, $results, 300 );
+		return $results;
+	}
+
+	/**
+	 * Get top authors.
+	 */
+	public function get_author_stats( $period = 'today' ) {
+		$cache_key = 'meowpack_authors_' . $period;
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached ) return $cached;
+
+		global $wpdb;
+		$visits_table = $wpdb->prefix . 'meow_visits';
+
+		$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
+		$month_start = current_time( 'Y-m' ) . '-01';
+		$year_start  = current_time( 'Y' ) . '-01-01';
+
+		switch ( $period ) {
+			case 'today':      $w_raw = $wpdb->prepare( 'visit_date = %s', current_time( 'Y-m-d' ) ); break;
+			case 'this_week':  $w_raw = $wpdb->prepare( 'visit_date >= %s', $monday ); break;
+			case 'this_month': $w_raw = $wpdb->prepare( 'visit_date >= %s', $month_start ); break;
+			case 'this_year':  $w_raw = $wpdb->prepare( 'visit_date >= %s', $year_start ); break;
+			default:           $w_raw = '1=1';
+		}
+
+		$results = $wpdb->get_results(
+			"SELECT post_author AS author_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(DISTINCT post_id) AS post_count
+			 FROM {$visits_table} WHERE is_bot = 0 AND {$w_raw} AND post_author > 0
+			 GROUP BY post_author ORDER BY views DESC LIMIT 20",
+			ARRAY_A
+		);
+
+		set_transient( $cache_key, $results, 300 );
+		return $results;
+	}
 
 	/**
 	 * Handle REST /stats request for admin dashboard.

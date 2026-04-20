@@ -103,9 +103,17 @@ class MeowPack_Admin {
 		);
 
 		wp_enqueue_script(
+			'chartjs',
+			'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
+			array(),
+			'4.4.3',
+			true
+		);
+
+		wp_enqueue_script(
 			'meowpack-admin',
 			MEOWPACK_URL . 'admin/assets/admin.js',
-			array( 'wp-api-fetch' ),
+			array( 'wp-api-fetch', 'chartjs' ),
 			MEOWPACK_VERSION,
 			true
 		);

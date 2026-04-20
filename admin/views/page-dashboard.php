@@ -105,8 +105,8 @@ $stats = MeowPack_Core::get_instance()->stats;
 			<div class="meowpack-export-group">
 				<label for="meowpack-export-from"><?php esc_html_e( 'Dari:', 'meowpack' ); ?></label>
 				<input type="date" id="meowpack-export-from"
-					value="<?php echo esc_attr( gmdate( 'Y-m-d', strtotime( '-30 days' ) ) ); ?>"
-					max="<?php echo esc_attr( gmdate( 'Y-m-d' ) ); ?>">
+					value="<?php echo esc_attr( date( 'Y-m-d', strtotime( '-30 days', current_time( 'timestamp' ) ) ) ); ?>"
+					max="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>">
 			</div>
 			<div class="meowpack-export-group">
 				<label for="meowpack-export-to"><?php esc_html_e( 'Sampai:', 'meowpack' ); ?></label>

@@ -6,75 +6,48 @@
  */
 defined( 'ABSPATH' ) || exit;
 
-global $wpdb;
-$table  = $wpdb->prefix . 'meow_visits';
+$stats = MeowPack_Core::get_instance()->stats;
 $period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'today';
 
-switch ( $period ) {
-	case 'today':
-		$where = $wpdb->prepare( 'AND visit_date = %s', current_time( 'Y-m-d' ) );
-		break;
-	case 'week':
-		$monday = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
-		$where = $wpdb->prepare( 'AND visit_date >= %s', $monday );
-		break;
-	case 'month':
-		$start = current_time( 'Y-m' ) . '-01';
-		$where = $wpdb->prepare( 'AND visit_date >= %s', $start );
-		break;
-	default:
-		$where = '';
-}
+// Fetch using new stats methods.
+$device_data  = $stats->get_device_stats( $period );
+$browser_data = $stats->get_browser_stats( $period );
+$os_data      = $stats->get_os_stats( $period );
 
-$base_where = "WHERE is_bot = 0 {$where}";
-
-// Device type breakdown.
-$device_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	"SELECT device_type, COUNT(*) AS views FROM {$table} {$base_where} AND device_type IS NOT NULL GROUP BY device_type ORDER BY views DESC",
-	ARRAY_A
-);
-
-// Browser breakdown.
-$browser_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	"SELECT browser, COUNT(*) AS views FROM {$table} {$base_where} AND browser IS NOT NULL GROUP BY browser ORDER BY views DESC LIMIT 10",
-	ARRAY_A
-);
-
-// OS breakdown.
-$os_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	"SELECT os, COUNT(*) AS views FROM {$table} {$base_where} AND os IS NOT NULL GROUP BY os ORDER BY views DESC LIMIT 10",
-	ARRAY_A
-);
-
-$total_views = array_sum( array_column( $device_rows ?: array(), 'views' ) );
+$total_views = array_sum( $device_data );
 
 $period_tabs = array(
-	'today'   => __( 'Hari Ini', 'meowpack' ),
-	'week'    => __( 'Minggu Ini', 'meowpack' ),
-	'month'   => __( 'Bulan Ini', 'meowpack' ),
-	'alltime' => __( 'Semua Waktu', 'meowpack' ),
+	'today'      => __( 'Hari Ini', 'meowpack' ),
+	'this_week'  => __( 'Minggu Ini', 'meowpack' ),
+	'this_month' => __( 'Bulan Ini', 'meowpack' ),
+	'this_year'  => __( 'Tahun Ini', 'meowpack' ),
+	'alltime'    => __( 'Semua Waktu', 'meowpack' ),
 );
 
-$device_icons = array( 'mobile' => '📱', 'tablet' => '📋', 'desktop' => '🖥️' );
+$device_icons  = array( 'mobile' => '📱', 'tablet' => '📋', 'desktop' => '🖥️' );
 $device_colors = array( 'mobile' => '#89b4fa', 'tablet' => '#cba6f7', 'desktop' => '#a6e3a1' );
 ?>
-<div>
-
-	<!-- Period tabs -->
-	<div style="margin-bottom:20px;">
-		<?php foreach ( $period_tabs as $key => $label ) : ?>
-			<a href="?page=meowpack&tab=device&period=<?php echo esc_attr( $key ); ?>"
-			   class="button <?php echo $key === $period ? 'button-primary' : ''; ?>"
-			   style="margin-right:6px;"><?php echo esc_html( $label ); ?></a>
-		<?php endforeach; ?>
+<div class="meowpack-section">
+	<div class="meowpack-section__header">
+		<h2>📱 <?php esc_html_e( 'Statistik Perangkat', 'meowpack' ); ?></h2>
+		<div class="meowpack-period-selector">
+			<?php foreach ( $period_tabs as $key => $label ) : ?>
+				<a href="<?php echo esc_url( add_query_arg( 'period', $key ) ); ?>" 
+				   class="button <?php echo $period === $key ? 'button-primary' : ''; ?>">
+					<?php echo esc_html( $label ); ?>
+				</a>
+			<?php endforeach; ?>
+		</div>
 	</div>
 
-	<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:24px;">
+	<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:24px; margin-top: 20px;">
 
 		<!-- Device Type -->
 		<div class="meowpack-card">
 			<h3><?php esc_html_e( 'Jenis Device', 'meowpack' ); ?></h3>
-			<canvas id="meow-device-chart" height="220"></canvas>
+			<div class="meowpack-chart-container meowpack-chart-container--pie">
+				<canvas id="meow-device-chart" height="220"></canvas>
+			</div>
 			<table class="widefat striped meowpack-table" style="margin-top:16px;">
 				<thead><tr>
 					<th><?php esc_html_e( 'Device', 'meowpack' ); ?></th>
@@ -82,12 +55,12 @@ $device_colors = array( 'mobile' => '#89b4fa', 'tablet' => '#cba6f7', 'desktop' 
 					<th>%</th>
 				</tr></thead>
 				<tbody>
-					<?php foreach ( (array) $device_rows as $row ) :
-						$pct = $total_views > 0 ? round( ( $row['views'] / $total_views ) * 100, 1 ) : 0;
+					<?php foreach ( $device_data as $type => $count ) :
+						$pct = $total_views > 0 ? round( ( $count / $total_views ) * 100, 1 ) : 0;
 					?>
 					<tr>
-						<td><?php echo esc_html( ( $device_icons[ $row['device_type'] ] ?? '❓' ) . ' ' . ucfirst( $row['device_type'] ?? 'unknown' ) ); ?></td>
-						<td><?php echo esc_html( number_format_i18n( (int) $row['views'] ) ); ?></td>
+						<td><?php echo esc_html( ( $device_icons[ $type ] ?? '❓' ) . ' ' . ucfirst( $type ) ); ?></td>
+						<td><strong><?php echo esc_html( MeowPack_ViewCounter::format_number( $count ) ); ?></strong></td>
 						<td><?php echo esc_html( $pct ); ?>%</td>
 					</tr>
 					<?php endforeach; ?>
@@ -98,17 +71,19 @@ $device_colors = array( 'mobile' => '#89b4fa', 'tablet' => '#cba6f7', 'desktop' 
 		<!-- Browser -->
 		<div class="meowpack-card">
 			<h3><?php esc_html_e( 'Browser', 'meowpack' ); ?></h3>
-			<canvas id="meow-browser-chart" height="220"></canvas>
+			<div class="meowpack-chart-container meowpack-chart-container--pie">
+				<canvas id="meow-browser-chart" height="220"></canvas>
+			</div>
 			<table class="widefat striped meowpack-table" style="margin-top:16px;">
 				<thead><tr>
 					<th><?php esc_html_e( 'Browser', 'meowpack' ); ?></th>
 					<th><?php esc_html_e( 'Views', 'meowpack' ); ?></th>
 				</tr></thead>
 				<tbody>
-					<?php foreach ( (array) $browser_rows as $row ) : ?>
+					<?php foreach ( $browser_data as $browser => $count ) : ?>
 					<tr>
-						<td><?php echo esc_html( $row['browser'] ?? '-' ); ?></td>
-						<td><?php echo esc_html( number_format_i18n( (int) $row['views'] ) ); ?></td>
+						<td><?php echo esc_html( $browser ); ?></td>
+						<td><strong><?php echo esc_html( MeowPack_ViewCounter::format_number( $count ) ); ?></strong></td>
 					</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -118,17 +93,19 @@ $device_colors = array( 'mobile' => '#89b4fa', 'tablet' => '#cba6f7', 'desktop' 
 		<!-- OS -->
 		<div class="meowpack-card">
 			<h3><?php esc_html_e( 'Sistem Operasi', 'meowpack' ); ?></h3>
-			<canvas id="meow-os-chart" height="220"></canvas>
+			<div class="meowpack-chart-container meowpack-chart-container--pie">
+				<canvas id="meow-os-chart" height="220"></canvas>
+			</div>
 			<table class="widefat striped meowpack-table" style="margin-top:16px;">
 				<thead><tr>
 					<th><?php esc_html_e( 'OS', 'meowpack' ); ?></th>
 					<th><?php esc_html_e( 'Views', 'meowpack' ); ?></th>
 				</tr></thead>
 				<tbody>
-					<?php foreach ( (array) $os_rows as $row ) : ?>
+					<?php foreach ( $os_data as $os => $count ) : ?>
 					<tr>
-						<td><?php echo esc_html( $row['os'] ?? '-' ); ?></td>
-						<td><?php echo esc_html( number_format_i18n( (int) $row['views'] ) ); ?></td>
+						<td><?php echo esc_html( $os ); ?></td>
+						<td><strong><?php echo esc_html( MeowPack_ViewCounter::format_number( $count ) ); ?></strong></td>
 					</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -139,31 +116,51 @@ $device_colors = array( 'mobile' => '#89b4fa', 'tablet' => '#cba6f7', 'desktop' 
 </div>
 
 <script>
-(function() {
-	// Chart.js must be loaded by admin.js.
-	if (typeof Chart === 'undefined') return;
+(function($) {
+	function initDeviceCharts() {
+		if (typeof Chart === 'undefined') {
+			setTimeout(initDeviceCharts, 100);
+			return;
+		}
 
-	var deviceData   = <?php echo wp_json_encode( array_values( $device_rows ?: array() ) ); ?>;
-	var browserData  = <?php echo wp_json_encode( array_values( $browser_rows ?: array() ) ); ?>;
-	var osData       = <?php echo wp_json_encode( array_values( $os_rows ?: array() ) ); ?>;
+		var palette = ['#89b4fa','#cba6f7','#a6e3a1','#f38ba8','#fab387','#f9e2af','#89dceb','#a6adc8'];
 
-	var palette = ['#89b4fa','#cba6f7','#a6e3a1','#f38ba8','#fab387','#f9e2af','#89dceb','#a6adc8'];
+		function makeDonut(id, labels, values) {
+			var ctx = document.getElementById(id);
+			if (!ctx || !values.length) return;
+			new Chart(ctx, {
+				type: 'doughnut',
+				data: {
+					labels: labels,
+					datasets: [{ 
+						data: values, 
+						backgroundColor: palette,
+						borderWidth: 0
+					}]
+				},
+				options: { 
+					responsive: true, 
+					maintainAspectRatio: false,
+					plugins: { legend: { position: 'bottom' } },
+					cutout: '70%'
+				}
+			});
+		}
 
-	function makeDonut(id, rows, labelKey, valueKey) {
-		var ctx = document.getElementById(id);
-		if (!ctx || !rows.length) return;
-		new Chart(ctx, {
-			type: 'doughnut',
-			data: {
-				labels:   rows.map(function(r) { return r[labelKey] || 'Unknown'; }),
-				datasets: [{ data: rows.map(function(r) { return parseInt(r[valueKey],10); }), backgroundColor: palette }]
-			},
-			options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-		});
+		makeDonut('meow-device-chart', 
+			<?php echo wp_json_encode( array_map( 'ucfirst', array_keys( $device_data ) ) ); ?>, 
+			<?php echo wp_json_encode( array_values( $device_data ) ); ?>
+		);
+		makeDonut('meow-browser-chart', 
+			<?php echo wp_json_encode( array_keys( $browser_data ) ); ?>, 
+			<?php echo wp_json_encode( array_values( $browser_data ) ); ?>
+		);
+		makeDonut('meow-os-chart', 
+			<?php echo wp_json_encode( array_keys( $os_data ) ); ?>, 
+			<?php echo wp_json_encode( array_values( $os_data ) ); ?>
+		);
 	}
 
-	makeDonut('meow-device-chart',  deviceData,  'device_type', 'views');
-	makeDonut('meow-browser-chart', browserData, 'browser',     'views');
-	makeDonut('meow-os-chart',      osData,      'os',          'views');
-})();
+	$(document).ready(initDeviceCharts);
+})(jQuery);
 </script>

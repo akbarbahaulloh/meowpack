@@ -1,209 +1,116 @@
 <?php
 /**
- * Admin page: Location Statistics (Country / Region / City).
+ * Admin view: Location (Country) Statistics.
  *
  * @package MeowPack
  */
 defined( 'ABSPATH' ) || exit;
 
-global $wpdb;
-$table  = $wpdb->prefix . 'meow_visits';
+$stats  = MeowPack_Core::get_instance()->stats;
 $period = isset( $_GET['period'] ) ? sanitize_key( $_GET['period'] ) : 'today';
-$drill  = isset( $_GET['country'] ) ? sanitize_text_field( wp_unslash( $_GET['country'] ) ) : '';
 
-switch ( $period ) {
-	case 'today':
-		$where_date = $wpdb->prepare( 'AND visit_date = %s', current_time( 'Y-m-d' ) );
-		break;
-	case 'week':
-		$monday     = date( 'Y-m-d', strtotime( 'monday this week', current_time( 'timestamp' ) ) );
-		$where_date = $wpdb->prepare( 'AND visit_date >= %s', $monday );
-		break;
-	case 'month':
-		$start      = current_time( 'Y-m' ) . '-01';
-		$where_date = $wpdb->prepare( 'AND visit_date >= %s', $start );
-		break;
-	default:
-		$where_date = '';
-}
-
-$base_where = "WHERE is_bot = 0 {$where_date}";
-
-// Top countries.
-$countries = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	"SELECT country_code, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS unique_visitors
-	 FROM {$table} {$base_where} AND country_code IS NOT NULL AND country_code != ''
-	 GROUP BY country_code
-	 ORDER BY views DESC
-	 LIMIT 30",
-	ARRAY_A
-);
-
-// If drilling into a country, show regions + cities.
-$regions = array();
-$cities  = array();
-if ( $drill ) {
-	$regions = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$wpdb->prepare(
-			"SELECT region, COUNT(*) AS views FROM {$table}
-			 WHERE is_bot = 0 AND country_code = %s {$where_date}
-			   AND region IS NOT NULL AND region != ''
-			 GROUP BY region
-			 ORDER BY views DESC
-			 LIMIT 20",
-			$drill
-		),
-		ARRAY_A
-	);
-
-	$cities = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$wpdb->prepare(
-			"SELECT city, COUNT(*) AS views FROM {$table}
-			 WHERE is_bot = 0 AND country_code = %s {$where_date}
-			   AND city IS NOT NULL AND city != ''
-			 GROUP BY city
-			 ORDER BY views DESC
-			 LIMIT 20",
-			$drill
-		),
-		ARRAY_A
-	);
-}
+$countries = $stats->get_country_stats( $period );
+$total_v   = array_sum( array_column( $countries, 'views' ) );
 
 $period_tabs = array(
-	'today'   => __( 'Hari Ini', 'meowpack' ),
-	'week'    => __( 'Minggu Ini', 'meowpack' ),
-	'month'   => __( 'Bulan Ini', 'meowpack' ),
-	'alltime' => __( 'Semua Waktu', 'meowpack' ),
+	'today'      => __( 'Hari Ini', 'meowpack' ),
+	'this_week'  => __( 'Minggu Ini', 'meowpack' ),
+	'this_month' => __( 'Bulan Ini', 'meowpack' ),
+	'this_year'  => __( 'Tahun Ini', 'meowpack' ),
+	'alltime'    => __( 'Semua Waktu', 'meowpack' ),
 );
-
-$total_views = array_sum( array_column( $countries ?: array(), 'views' ) );
 ?>
-<div>
-
-	<!-- Period tabs -->
-	<div style="margin-bottom:20px;">
-		<?php foreach ( $period_tabs as $key => $label ) : ?>
-			<a href="?page=meowpack&tab=location&period=<?php echo esc_attr( $key ); ?>"
-			   class="button <?php echo $key === $period ? 'button-primary' : ''; ?>"
-			   style="margin-right:6px;"><?php echo esc_html( $label ); ?></a>
-		<?php endforeach; ?>
+<div class="meowpack-section">
+	<div class="meowpack-section__header">
+		<h2>🌍 <?php esc_html_e( 'Lokasi Pengunjung', 'meowpack' ); ?></h2>
+		<div class="meowpack-period-selector">
+			<?php foreach ( $period_tabs as $key => $label ) : ?>
+				<a href="<?php echo esc_url( add_query_arg( 'period', $key ) ); ?>" 
+				   class="button <?php echo $period === $key ? 'button-primary' : ''; ?>">
+					<?php echo esc_html( $label ); ?>
+				</a>
+			<?php endforeach; ?>
+		</div>
 	</div>
 
-	<div style="display:grid; grid-template-columns:2fr 1fr; gap:24px; align-items:start;">
-
-		<!-- Countries table -->
-		<div class="meowpack-card">
-			<h3><?php esc_html_e( 'Top Negara', 'meowpack' ); ?></h3>
+	<div style="display: flex; gap: 30px; margin-top: 30px; align-items: flex-start; flex-wrap: wrap;">
+		
+		<div style="flex: 2; min-width: 400px;">
 			<?php if ( empty( $countries ) ) : ?>
-				<p><?php esc_html_e( 'Belum ada data lokasi. Pastikan fitur geolokasi aktif.', 'meowpack' ); ?></p>
+				<p class="meowpack-empty"><?php esc_html_e( 'Belum ada data lokasi untuk periode ini.', 'meowpack' ); ?></p>
 			<?php else : ?>
-			<table class="widefat striped meowpack-table">
-				<thead><tr>
-					<th>#</th>
-					<th><?php esc_html_e( 'Negara', 'meowpack' ); ?></th>
-					<th><?php esc_html_e( 'Views', 'meowpack' ); ?></th>
-					<th><?php esc_html_e( 'Unik', 'meowpack' ); ?></th>
-					<th>%</th>
-					<th></th>
-				</tr></thead>
-				<tbody>
-					<?php foreach ( $countries as $i => $row ) :
-						$pct = $total_views > 0 ? round( ( $row['views'] / $total_views ) * 100, 1 ) : 0;
-					?>
-					<tr>
-						<td><?php echo esc_html( $i + 1 ); ?></td>
-						<td>
-							<span style="font-size:1.4em; vertical-align:middle;"
-							      title="<?php echo esc_attr( $row['country_code'] ); ?>">
-								<?php
-								// Flag emoji from country code (unicode trick).
-								$cc = strtoupper( $row['country_code'] ?? '' );
-								if ( strlen( $cc ) === 2 ) {
-									$flag = mb_convert_encoding(
-										'&#' . ( 0x1F1E0 + ord( $cc[0] ) - ord( 'A' ) ) . ';&#' . ( 0x1F1E0 + ord( $cc[1] ) - ord( 'A' ) ) . ';',
-										'UTF-8',
-										'HTML-ENTITIES'
-									);
-									echo $flag; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-								}
-								?>
-							</span>
-							<?php echo esc_html( $row['country_code'] ); ?>
-						</td>
-						<td><?php echo esc_html( number_format_i18n( (int) $row['views'] ) ); ?></td>
-						<td><?php echo esc_html( number_format_i18n( (int) $row['unique_visitors'] ) ); ?></td>
-						<td>
-							<div style="background:#313244;border-radius:4px;height:8px;width:100px;">
-								<div style="background:#89b4fa;height:8px;border-radius:4px;width:<?php echo esc_attr( $pct ); ?>%;"></div>
-							</div>
-							<?php echo esc_html( $pct ); ?>%
-						</td>
-						<td>
-							<a href="?page=meowpack&tab=location&period=<?php echo esc_attr( $period ); ?>&country=<?php echo esc_attr( $row['country_code'] ); ?>"
-							   class="button button-small"><?php esc_html_e( 'Detail', 'meowpack' ); ?></a>
-						</td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+				<table class="widefat striped meowpack-table">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Negara', 'meowpack' ); ?></th>
+							<th><?php esc_html_e( 'Pengunjung Unik', 'meowpack' ); ?></th>
+							<th><?php esc_html_e( 'Total Tampilan', 'meowpack' ); ?></th>
+							<th>%</th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $countries as $row ) :
+							$pct = $total_v > 0 ? round( ( $row['views'] / $total_v ) * 100, 1 ) : 0;
+							$flag_url = 'https://flagcdn.com/w20/' . strtolower( $row['country_code'] ) . '.png';
+						?>
+						<tr>
+							<td>
+								<img src="<?php echo esc_url( $flag_url ); ?>" width="20" style="vertical-align:middle; margin-right:8px; border:1px solid #eee;">
+								<?php echo esc_html( $row['country_code'] ); ?>
+							</td>
+							<td><strong><?php echo esc_html( MeowPack_ViewCounter::format_number( $row['unique_visitors'] ) ); ?></strong></td>
+							<td><?php echo esc_html( MeowPack_ViewCounter::format_number( $row['views'] ) ); ?></td>
+							<td><?php echo esc_html( $pct ); ?>%</td>
+						</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
 			<?php endif; ?>
 		</div>
 
-		<!-- Drill-down panel -->
-		<div>
-			<?php if ( $drill ) : ?>
-			<div class="meowpack-card" style="margin-bottom:20px;">
-				<h3><?php printf( esc_html__( 'Wilayah — %s', 'meowpack' ), esc_html( $drill ) ); ?></h3>
-				<?php if ( empty( $regions ) ) : ?>
-					<p><?php esc_html_e( 'Tidak ada data wilayah.', 'meowpack' ); ?></p>
-				<?php else : ?>
-				<table class="widefat striped meowpack-table">
-					<thead><tr>
-						<th><?php esc_html_e( 'Wilayah', 'meowpack' ); ?></th>
-						<th><?php esc_html_e( 'Views', 'meowpack' ); ?></th>
-					</tr></thead>
-					<tbody>
-						<?php foreach ( $regions as $row ) : ?>
-						<tr>
-							<td><?php echo esc_html( $row['region'] ); ?></td>
-							<td><?php echo esc_html( number_format_i18n( (int) $row['views'] ) ); ?></td>
-						</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-				<?php endif; ?>
-			</div>
-
+		<div style="flex: 1; min-width: 250px;">
 			<div class="meowpack-card">
-				<h3><?php printf( esc_html__( 'Kota — %s', 'meowpack' ), esc_html( $drill ) ); ?></h3>
-				<?php if ( empty( $cities ) ) : ?>
-					<p><?php esc_html_e( 'Tidak ada data kota.', 'meowpack' ); ?></p>
-				<?php else : ?>
-				<table class="widefat striped meowpack-table">
-					<thead><tr>
-						<th><?php esc_html_e( 'Kota', 'meowpack' ); ?></th>
-						<th><?php esc_html_e( 'Views', 'meowpack' ); ?></th>
-					</tr></thead>
-					<tbody>
-						<?php foreach ( $cities as $row ) : ?>
-						<tr>
-							<td><?php echo esc_html( $row['city'] ); ?></td>
-							<td><?php echo esc_html( number_format_i18n( (int) $row['views'] ) ); ?></td>
-						</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-				<?php endif; ?>
+				<h3 style="margin-top:0;"><?php esc_html_e( 'Sebaran Geografis', 'meowpack' ); ?></h3>
+				<div class="meowpack-chart-container meowpack-chart-container--pie">
+					<canvas id="meow-location-chart" height="250"></canvas>
+				</div>
 			</div>
-			<?php else : ?>
-			<div class="meowpack-card">
-				<p style="color:#6c7086; font-style:italic;">
-					<?php esc_html_e( 'Klik "Detail" pada baris negara untuk melihat rincian wilayah dan kota.', 'meowpack' ); ?>
-				</p>
-			</div>
-			<?php endif; ?>
 		</div>
 
 	</div>
 </div>
+
+<script>
+(function($) {
+	function initLocationChart() {
+		if (typeof Chart === 'undefined') {
+			setTimeout(initLocationChart, 100);
+			return;
+		}
+
+		var countries = <?php echo wp_json_encode( array_slice( $countries, 0, 8 ) ); ?>;
+		var ctx = document.getElementById('meow-location-chart');
+		if (!ctx || !countries.length) return;
+
+		new Chart(ctx, {
+			type: 'doughnut',
+			data: {
+				labels: countries.map(function(c) { return c.country_code; }),
+				datasets: [{
+					data: countries.map(function(c) { return parseInt(c.views, 10); }),
+					backgroundColor: ['#6366f1','#06b6d4','#f59e0b','#10b981','#ec4899','#8b5cf6','#f43f5e','#3b82f6'],
+					borderWidth: 0
+				}]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: { legend: { position: 'bottom' } },
+				cutout: '70%'
+			}
+		});
+	}
+
+	$(document).ready(initLocationChart);
+})(jQuery);
+</script>

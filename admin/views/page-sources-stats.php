@@ -16,6 +16,7 @@ $period_options = array(
 	'today'      => __( 'Hari Ini', 'meowpack' ),
 	'this_week'  => __( 'Minggu Ini', 'meowpack' ),
 	'this_month' => __( 'Bulan Ini', 'meowpack' ),
+	'this_year'  => __( 'Tahun Ini', 'meowpack' ),
 	'alltime'    => __( 'Semua Waktu', 'meowpack' ),
 );
 
@@ -94,8 +95,11 @@ $total_s = array_sum( $sources );
 
 <script>
 (function($) {
-	$(document).ready(function() {
-		if (typeof Chart === 'undefined') return;
+	function initSourceChart() {
+		if (typeof Chart === 'undefined') {
+			setTimeout(initSourceChart, 100);
+			return;
+		}
 		
 		const sourceData = <?php echo wp_json_encode( $sources ); ?>;
 		const ctx = document.getElementById('meowpack-chart-sources-dedicated');
@@ -107,11 +111,11 @@ $total_s = array_sum( $sources );
 				labels: ['Langsung', 'Pencarian', 'Sosial Media', 'Referral', 'Email'],
 				datasets: [{
 					data: [
-						sourceData.direct,
-						sourceData.search,
-						sourceData.social,
-						sourceData.referral,
-						sourceData.email
+						sourceData.direct || 0,
+						sourceData.search || 0,
+						sourceData.social || 0,
+						sourceData.referral || 0,
+						sourceData.email || 0
 					],
 					backgroundColor: ['#6366f1', '#06b6d4', '#f59e0b', '#10b981', '#ec4899'],
 					borderWidth: 0
@@ -123,9 +127,12 @@ $total_s = array_sum( $sources );
 				plugins: {
 					legend: { position: 'bottom' }
 				},
-				cutout: '70%'
+				cutout: '70%',
+				animation: { duration: 1000 }
 			}
 		});
-	});
+	}
+
+	$(document).ready(initSourceChart);
 })(jQuery);
 </script>
