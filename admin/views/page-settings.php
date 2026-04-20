@@ -235,23 +235,6 @@ $s = function( $key, $default = '' ) {
 		</p>
 
 		<div class="meowpack-row" style="display:flex; gap:20px; margin-top:20px;">
-			<!-- Jetpack Block -->
-			<div style="flex:1; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
-				<h3>🔌 <?php esc_html_e( 'Auto-Detect Jetpack', 'meowpack' ); ?></h3>
-				<?php 
-				$importer = MeowPack_Core::get_instance()->importer;
-				if ( $importer->has_jetpack_data() ) : 
-				?>
-					<div style="color:#22c55e; font-weight:600; margin-bottom:10px;">✅ <?php esc_html_e( 'Data Jetpack ditemukan!', 'meowpack' ); ?></div>
-					<button type="button" id="meowpack-import-jetpack" class="button button-primary">
-						<?php esc_html_e( '🚀 Mulai Import Sekarang', 'meowpack' ); ?>
-					</button>
-				<?php else : ?>
-					<div style="color:#64748b; margin-bottom:10px;">⚪ <?php esc_html_e( 'Tidak ada data Jetpack yang terdeteksi.', 'meowpack' ); ?></div>
-					<p class="description"><?php esc_html_e( 'MeowPack akan mencari tabel Jetpack lama (walaupun plugin sudah dihapus).', 'meowpack' ); ?></p>
-				<?php endif; ?>
-			</div>
-
 			<!-- CSV Block -->
 			<div style="flex:1; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
 				<h3>📄 <?php esc_html_e( 'Import via CSV', 'meowpack' ); ?></h3>
@@ -281,7 +264,6 @@ $s = function( $key, $default = '' ) {
 		const csvFileEl = $('#meowpack-csv-file');
 		const csvNameEl = $('#meowpack-csv-filename');
 		const csvBtnEl  = $('#meowpack-import-csv');
-		const jpBtnEl   = $('#meowpack-import-jetpack');
 		const statusEl  = $('#meowpack-import-status');
 		const logEl     = $('#import-log');
 		const msgEl     = $('#import-msg');
@@ -320,7 +302,6 @@ $s = function( $key, $default = '' ) {
 						barEl.css('width', '100%');
 						msgEl.html(`<span style="color:#22c55e;">✅ Migrasi Selesai! Total ${total_imported} data berhasil diimpor.</span>`);
 						csvBtnEl.prop('disabled', false).text('📤 Proses CSV');
-						jpBtnEl.prop('disabled', false).text('🚀 Mulai Import Sekarang');
 					} else {
 						let pct = Math.min(95, Math.round((res.offset) / (res.offset + 1000) * 100)); 
 						barEl.css('width', pct + '%');
@@ -332,12 +313,6 @@ $s = function( $key, $default = '' ) {
 				}
 			});
 		}
-
-		jpBtnEl.on('click', function() {
-			$(this).prop('disabled', true).text('⏳ Loading...');
-			logEl.empty();
-			runImport('jetpack', 0, 0, '');
-		});
 
 		csvBtnEl.on('click', function() {
 			const file = csvFileEl[0].files[0];
