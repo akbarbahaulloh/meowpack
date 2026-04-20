@@ -108,15 +108,15 @@ $stats = MeowPack_Core::get_instance()->stats;
 			<div class="meowpack-section__header">
 				<h2><?php esc_html_e( 'Artikel Terpopuler', 'meowpack' ); ?></h2>
 				<select id="meowpack-top-period">
-					<option value="this_month"><?php esc_html_e( 'Bulan Ini', 'meowpack' ); ?></option>
-					<option value="this_week"><?php esc_html_e( 'Minggu Ini', 'meowpack' ); ?></option>
+					<option value="alltime" selected><?php esc_html_e( 'Semua Waktu', 'meowpack' ); ?></option>
 					<option value="today"><?php esc_html_e( 'Hari Ini', 'meowpack' ); ?></option>
-					<option value="alltime"><?php esc_html_e( 'Semua Waktu', 'meowpack' ); ?></option>
+					<option value="this_week"><?php esc_html_e( 'Minggu Ini', 'meowpack' ); ?></option>
+					<option value="this_month"><?php esc_html_e( 'Bulan Ini', 'meowpack' ); ?></option>
 				</select>
 			</div>
 			<div id="meowpack-top-posts">
 				<?php
-				$top = $stats->get_top_posts( 10, 'this_month' );
+				$top = $stats->get_top_posts( 10, 'alltime' );
 				if ( empty( $top ) ) :
 				?>
 				<p class="meowpack-empty"><?php esc_html_e( 'Belum ada data.', 'meowpack' ); ?></p>
@@ -145,7 +145,7 @@ $stats = MeowPack_Core::get_instance()->stats;
 				<canvas id="meowpack-chart-sources" height="250"></canvas>
 			</div>
 			<?php
-			$sources = $stats->get_source_breakdown( 'this_month' );
+			$sources = $stats->get_source_breakdown( 'alltime' );
 			$total_s = array_sum( $sources );
 			if ( $total_s > 0 ) :
 			?>
@@ -184,5 +184,5 @@ $stats = MeowPack_Core::get_instance()->stats;
 <script>
 // Embed chart data inline to avoid extra REST call on page load.
 window.meowpackChartData = <?php echo wp_json_encode( $stats->get_last_n_days( 30 ) ); ?>;
-window.meowpackSourceData = <?php echo wp_json_encode( $stats->get_source_breakdown( 'this_month' ) ); ?>;
+window.meowpackSourceData = <?php echo wp_json_encode( $stats->get_source_breakdown( 'alltime' ) ); ?>;
 </script>

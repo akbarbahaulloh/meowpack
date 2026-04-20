@@ -35,8 +35,12 @@ class MeowPack_Importer {
 		$offset = absint( $request->get_param( 'offset' ) ?? 0 );
 		$limit  = 200;
 
+		if ( 'api' === $source ) {
+			return new WP_REST_Response( $this->import_from_api( $offset ), 200 );
+		}
+
 		if ( 'csv' !== $source ) {
-			return new WP_REST_Response( array( 'error' => 'Sumber migrasi tidak didukung. Silakan gunakan impor CSV.' ), 400 );
+			return new WP_REST_Response( array( 'error' => 'Sumber migrasi tidak didukung. Silakan gunakan impor CSV atau Direct API.' ), 400 );
 		}
 
 		$upload_dir = wp_upload_dir();
@@ -67,6 +71,158 @@ class MeowPack_Importer {
 		return new WP_REST_Response( $result, 200 );
 	}
 
+
+	/**
+	 * Makes an authenticated request to WordPress.com API using Jetpack's connection.
+	 * 
+	 * @param string $endpoint API Path.
+	 * @param array  $params   Query parameters.
+	 * @return array|WP_Error
+	 */
+	private function fetch_jetpack_api( $endpoint, $params = array() ) {
+		if ( ! class_exists( 'Jetpack_Options' ) || ( ! class_exists( 'Automattic\Jetpack\Connection\Client' ) && ! class_exists( 'Jetpack_Client' ) ) ) {
+			return new WP_Error( 'no_jetpack', 'Plugin Jetpack harus aktif dan terhubung dengan WordPress.com untuk menyedot data via API.' );
+		}
+
+		$site_id = Jetpack_Options::get_option( 'id' );
+		if ( ! $site_id ) {
+			return new WP_Error( 'no_jetpack_id', 'Koneksi Jetpack terputus. Silakan hubungkan Jetpack kembali sebelum melakukan migrasi.' );
+		}
+
+		$path = '/sites/' . $site_id . '/' . ltrim( $endpoint, '/' );
+		if ( ! empty( $params ) ) {
+			$path = add_query_arg( $params, $path );
+		}
+
+		if ( class_exists( 'Automattic\Jetpack\Connection\Client' ) ) {
+			$response = Automattic\Jetpack\Connection\Client::wpcom_json_api_request_as_blog( $path, '1.1' );
+		} else {
+			$response = Jetpack_Client::wpcom_json_api_request_as_blog( $path, '1.1' );
+		}
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( isset( $data['error'] ) && 'unauthorized' === $data['error'] ) {
+			return new WP_Error( 'unauthorized', 'Token Jetpack Anda sudah hangus/ditolak oleh WordPress.com. Silakan gunakan Impor CSV.' );
+		}
+
+		if ( isset( $data['error'] ) ) {
+			return new WP_Error( 'api_error', $data['message'] ?? $data['error'] );
+		}
+
+		return $data;
+	}
+
+	/**
+	 * Direct API Scraper using Token Hijacking.
+	 * 
+	 * @param int $step Offset step (0 = visits, 1 = top posts, 2 = referrers).
+	 * @return array
+	 */
+	public function import_from_api( $step = 0 ) {
+		$imported = 0;
+		$skipped  = 0;
+		$done     = false;
+		$msg      = '';
+
+		switch ( $step ) {
+			case 0:
+				// Step 0: Pull last 30 days of daily limits
+				$data = $this->fetch_jetpack_api( 'stats/visits', array( 'unit' => 'day', 'quantity' => 30 ) );
+				if ( is_wp_error( $data ) ) {
+					return array( 'success' => false, 'error' => $data->get_error_message() );
+				}
+
+				if ( ! empty( $data['data'] ) && is_array( $data['data'] ) ) {
+					foreach ( $data['data'] as $row ) {
+						// Format: [ "2024-04-20", 1500, 1000 ] -> date, views, visitors
+						if ( count( $row ) < 2 ) continue;
+						$date     = date( 'Y-m-d', strtotime( $row[0] ) );
+						$views    = absint( $row[1] );
+						$visitors = absint( $row[2] ?? 0 );
+						$result   = $this->upsert_daily_stat( $date, 0, $views, $visitors, 'source_direct' );
+						$result ? $imported++ : $skipped++;
+					}
+				}
+				$msg = "Berhasil menarik data harian 30 hari ke belakang.";
+				$next_step = 1;
+				break;
+
+			case 1:
+				// Step 1: Pull Top Posts (All Time)
+				$data = $this->fetch_jetpack_api( 'stats/post-views', array( 'date' => 'all', 'max' => 100 ) );
+				if ( is_wp_error( $data ) ) {
+					return array( 'success' => false, 'error' => $data->get_error_message() );
+				}
+
+				// Depending on API response, top posts might be in 'days' or 'post-views' array
+				$posts = $data['days'][0]['post-views'] ?? ( $data['post-views'] ?? array() );
+				foreach ( $posts as $p ) {
+					$post_id = absint( $p['post']['ID'] ?? 0 );
+					$views   = absint( $p['views'] ?? 0 );
+					if ( ! $post_id || ! $views ) continue;
+					
+					// Calculate fallback date based on publish date
+					$date = '1970-01-01';
+					$post = get_post( $post_id );
+					if ( $post ) {
+						$date = gmdate( 'Y-m-d', strtotime( $post->post_date ) );
+					}
+					$result = $this->upsert_daily_stat( $date, $post_id, $views, 0 );
+					$result ? $imported++ : $skipped++;
+				}
+				$msg = "Berhasil menarik data total Artikel Terpopuler.";
+				$next_step = 2;
+				break;
+
+			case 2:
+				// Step 2: Pull Top Referrers (All Time)
+				$data = $this->fetch_jetpack_api( 'stats/referrers', array( 'date' => 'all', 'max' => 50 ) );
+				if ( is_wp_error( $data ) ) {
+					// Soft fail since referrers aren't critical
+					$done = true;
+					break;
+				}
+
+				$groups = $data['days'][0]['groups'] ?? ( $data['groups'] ?? array() );
+				foreach ( $groups as $group ) {
+					$name  = strtolower( trim( $group['name'] ?? '' ) );
+					$views = absint( $group['total'] ?? 0 );
+					if ( ! $name || ! $views ) continue;
+
+					$source_col = 'source_referral';
+					if ( strpos( $name, 'search engines' ) !== false || strpos( $name, 'mesin pencari' ) !== false || strpos( $name, 'google' ) !== false ) {
+						$source_col = 'source_search';
+					} elseif ( strpos( $name, 'facebook' ) !== false || strpos( $name, 'twitter' ) !== false || strpos( $name, 'instagram' ) !== false ) {
+						$source_col = 'source_social';
+					}
+					$result = $this->upsert_daily_stat( '1970-01-01', 0, $views, 0, $source_col );
+					$result ? $imported++ : $skipped++;
+				}
+				$msg  = "Berhasil menarik data total Referrer (Selesai).";
+				$done = true;
+				$next_step = 3;
+				break;
+
+			default:
+				$done = true;
+				$next_step = $step;
+		}
+
+		return array(
+			'success'  => true,
+			'imported' => $imported,
+			'skipped'  => $skipped,
+			'offset'   => $next_step,
+			'done'     => $done,
+			'message'  => $msg,
+		);
+	}
 
 	/**
 	 * Import from a WordPress.com CSV export file.

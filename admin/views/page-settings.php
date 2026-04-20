@@ -235,6 +235,27 @@ $s = function( $key, $default = '' ) {
 		</p>
 
 		<div class="meowpack-row" style="display:flex; gap:20px; margin-top:20px;">
+			<!-- Jetpack API Block -->
+			<div style="flex:1; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
+				<h3>🔌 <?php esc_html_e( 'Direct API Scraper', 'meowpack' ); ?></h3>
+				<?php 
+				$jp_active = class_exists( 'Jetpack_Options' ) && Jetpack_Options::get_option('id');
+				if ( $jp_active ) : 
+				?>
+					<div style="color:#22c55e; font-weight:600; margin-bottom:10px;">✅ <?php esc_html_e( 'Koneksi Jetpack Aktif!', 'meowpack' ); ?></div>
+					<p class="description" style="margin-bottom:15px; font-size:12px;">Menyedot data 30 hari ke belakang dan menyatukan riwayat *"All-Time"* (Artikel/Referrer).</p>
+					<button type="button" id="meowpack-import-api" class="button button-primary">
+						<?php esc_html_e( '🚀 Mulai Scraping API', 'meowpack' ); ?>
+					</button>
+				<?php else : ?>
+					<div style="color:#ef4444; margin-bottom:10px;">❌ <?php esc_html_e( 'Koneksi Jetpack Terputus.', 'meowpack' ); ?></div>
+					<p class="description" style="font-size:12px;"><?php esc_html_e( 'Plugin Jetpack harus aktif untuk dapat meretas jalur API-nya. Gunakan Impor CSV jika Anda sudah menghapus Jetpack.', 'meowpack' ); ?></p>
+					<button type="button" class="button button-primary" disabled>
+						<?php esc_html_e( '🚀 Mulai Scraping API', 'meowpack' ); ?>
+					</button>
+				<?php endif; ?>
+			</div>
+
 			<!-- CSV Block -->
 			<div style="flex:1; padding:20px; background:#fff; border:1px solid #ddd; border-radius:8px;">
 				<h3>📄 <?php esc_html_e( 'Import via CSV', 'meowpack' ); ?></h3>
@@ -264,6 +285,7 @@ $s = function( $key, $default = '' ) {
 		const csvFileEl = $('#meowpack-csv-file');
 		const csvNameEl = $('#meowpack-csv-filename');
 		const csvBtnEl  = $('#meowpack-import-csv');
+		const apiBtnEl  = $('#meowpack-import-api');
 		const statusEl  = $('#meowpack-import-status');
 		const logEl     = $('#import-log');
 		const msgEl     = $('#import-msg');
@@ -310,8 +332,9 @@ $s = function( $key, $default = '' ) {
 					
 					if (res.done || res.success === false) {
 						barEl.css('width', '100%');
-						msgEl.html(`<span style="color:#22c55e;">✅ Migrasi Selesai! Total ${total_imported} data berhasil diimpor.</span>`);
+						msgEl.html(`<span style="color:#22c55e;">✅ Migrasi Selesai! Total ${total_imported} data berhasil diimpor/diupdate.</span>`);
 						csvBtnEl.prop('disabled', false).text('📤 Proses CSV');
+						if (apiBtnEl.length) apiBtnEl.prop('disabled', false).text('🚀 Mulai Scraping API');
 					} else {
 						let pct = Math.min(95, Math.round((res.offset) / (res.offset + 1000) * 100)); 
 						barEl.css('width', pct + '%');
@@ -334,6 +357,14 @@ $s = function( $key, $default = '' ) {
 			// Run import, file will be pulled directly from the input element inside the function
 			runImport('csv', 0, 0);
 		});
+
+		if (apiBtnEl.length) {
+			apiBtnEl.on('click', function() {
+				$(this).prop('disabled', true).text('⏳ Menghubungi API...');
+				logEl.empty();
+				runImport('api', 0, 0);
+			});
+		}
 	});
 	</script>
 
