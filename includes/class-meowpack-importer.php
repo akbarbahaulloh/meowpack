@@ -35,14 +35,33 @@ class MeowPack_Importer {
 		$offset = absint( $request->get_param( 'offset' ) ?? 0 );
 		$limit  = 200;
 
-		if ( 'csv' === $source ) {
-			$file = sanitize_text_field( $request->get_param( 'file' ) ?? '' );
-			if ( ! $file || ! file_exists( $file ) ) {
-				return new WP_REST_Response( array( 'error' => 'File tidak ditemukan' ), 400 );
-			}
-			$result = $this->import_from_csv( $file, $offset, $limit );
-		} else {
+		if ( 'csv' !== $source ) {
 			return new WP_REST_Response( array( 'error' => 'Sumber migrasi tidak didukung. Silakan gunakan impor CSV.' ), 400 );
+		}
+
+		$upload_dir = wp_upload_dir();
+		$temp_file  = $upload_dir['basedir'] . '/meowpack_import_temp.csv';
+
+		if ( $offset === 0 ) {
+			$files = $request->get_file_params();
+			if ( empty( $files['file'] ) || empty( $files['file']['tmp_name'] ) ) {
+				return new WP_REST_Response( array( 'error' => 'File CSV wajib diunggah.' ), 400 );
+			}
+			$ext = pathinfo( $files['file']['name'], PATHINFO_EXTENSION );
+			if ( strtolower( $ext ) !== 'csv' ) {
+				return new WP_REST_Response( array( 'error' => 'Gagal: Ekstensi harus .csv' ), 400 );
+			}
+			move_uploaded_file( $files['file']['tmp_name'], $temp_file );
+		}
+
+		if ( ! file_exists( $temp_file ) ) {
+			return new WP_REST_Response( array( 'error' => 'File sementara tidak ditemukan. Mohon unggah ulang.' ), 400 );
+		}
+
+		$result = $this->import_from_csv( $temp_file, $offset, $limit );
+
+		if ( ! empty( $result['done'] ) || ! empty( $result['error'] ) ) {
+			@unlink( $temp_file );
 		}
 
 		return new WP_REST_Response( $result, 200 );

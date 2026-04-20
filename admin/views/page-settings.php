@@ -276,9 +276,18 @@ $s = function( $key, $default = '' ) {
 			}
 		});
 
-		function runImport(source, offset, total_imported, fileContent) {
+		function runImport(source, offset, total_imported) {
 			statusEl.fadeIn();
 			msgEl.text(`Memproses... (Offset: ${offset})`);
+
+			let formData = new FormData();
+			formData.append('source', source);
+			formData.append('offset', offset);
+			
+			// Attach file only on the first request to save bandwidth
+			if (offset === 0 && csvFileEl[0].files.length) {
+				formData.append('file', csvFileEl[0].files[0]);
+			}
 
 			$.ajax({
 				url: meowpackAdmin.apiBase + 'import',
@@ -286,8 +295,9 @@ $s = function( $key, $default = '' ) {
 				beforeSend: function(xhr) {
 					xhr.setRequestHeader('X-WP-Nonce', meowpackAdmin.nonce);
 				},
-				contentType: 'application/json',
-				data: JSON.stringify({ source, offset, file: fileContent || '' }),
+				data: formData,
+				processData: false,
+				contentType: false,
 				success: function(res) {
 					if (res.error) {
 						msgEl.html('<span style="color:#ef4444;">❌ Error: ' + res.error + '</span>');
@@ -305,7 +315,7 @@ $s = function( $key, $default = '' ) {
 					} else {
 						let pct = Math.min(95, Math.round((res.offset) / (res.offset + 1000) * 100)); 
 						barEl.css('width', pct + '%');
-						runImport(source, res.offset, total_imported, fileContent);
+						runImport(source, res.offset, total_imported);
 					}
 				},
 				error: function(xhr) {
@@ -318,14 +328,11 @@ $s = function( $key, $default = '' ) {
 			const file = csvFileEl[0].files[0];
 			if (!file) return;
 
-			$(this).prop('disabled', true).text('⏳ Membaca...');
+			$(this).prop('disabled', true).text('⏳ Mengunggah...');
 			logEl.empty();
 			
-			const reader = new FileReader();
-			reader.onload = function(e) {
-				runImport('csv', 0, 0, e.target.result);
-			};
-			reader.readAsText(file);
+			// Run import, file will be pulled directly from the input element inside the function
+			runImport('csv', 0, 0);
 		});
 	});
 
