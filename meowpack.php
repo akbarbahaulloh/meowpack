@@ -102,6 +102,7 @@ function meowpack_load_files() {
 		'includes/class-meowpack-content-moderation.php',
 		'includes/class-meowpack-frontend-enhancer.php',
 		'includes/class-meowpack-github-updater.php',
+		'includes/class-meowpack-malware-scanner.php',
 
 		// Admin (last — depends on all the above).
 		'admin/class-meowpack-admin.php',

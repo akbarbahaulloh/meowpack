@@ -17,8 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class MeowPack_Database {
 
-	/** @var string Current DB schema version. */
-	const SCHEMA_VERSION = '2.1.0';
+	/** @var string Database schema version. */
+	const SCHEMA_VERSION = '2.2.0';
 
 	/** @var string Option key for stored schema version. */
 	const SCHEMA_OPTION = 'meowpack_db_version';
@@ -260,8 +260,24 @@ class MeowPack_Database {
 			INDEX idx_category (matched_category)
 		) $charset;";
 
+		// -----------------------------------------------------------------------
+		// [NEW v2.2.0] Table: malware & webshell scanner logs.
+		// -----------------------------------------------------------------------
+		$sql_malware_logs = "CREATE TABLE {$wpdb->prefix}meow_malware_logs (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			file_path VARCHAR(500) NOT NULL,
+			signature VARCHAR(200) NOT NULL,
+			category VARCHAR(50) NOT NULL DEFAULT 'malware',
+			status VARCHAR(20) NOT NULL DEFAULT 'detected',
+			PRIMARY KEY (id),
+			INDEX idx_status (status),
+			INDEX idx_category (category)
+		) $charset;";
+
 		dbDelta( $sql_content_rules );
 		dbDelta( $sql_content_logs );
+		dbDelta( $sql_malware_logs );
 
 		// Seed default settings.
 		self::seed_defaults();

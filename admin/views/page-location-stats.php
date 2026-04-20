@@ -79,13 +79,12 @@ $period_tabs = array(
 
 $total_views = array_sum( array_column( $countries ?: array(), 'views' ) );
 ?>
-<div class="wrap meowpack-wrap">
-	<h1>🌏 <?php esc_html_e( 'Statistik Lokasi', 'meowpack' ); ?></h1>
+<div>
 
 	<!-- Period tabs -->
 	<div style="margin-bottom:20px;">
 		<?php foreach ( $period_tabs as $key => $label ) : ?>
-			<a href="?page=meowpack-location-stats&period=<?php echo esc_attr( $key ); ?>"
+			<a href="?page=meowpack&tab=location&period=<?php echo esc_attr( $key ); ?>"
 			   class="button <?php echo $key === $period ? 'button-primary' : ''; ?>"
 			   style="margin-right:6px;"><?php echo esc_html( $label ); ?></a>
 		<?php endforeach; ?>
@@ -141,7 +140,7 @@ $total_views = array_sum( array_column( $countries ?: array(), 'views' ) );
 							<?php echo esc_html( $pct ); ?>%
 						</td>
 						<td>
-							<a href="?page=meowpack-location-stats&period=<?php echo esc_attr( $period ); ?>&country=<?php echo esc_attr( $row['country_code'] ); ?>"
+							<a href="?page=meowpack&tab=location&period=<?php echo esc_attr( $period ); ?>&country=<?php echo esc_attr( $row['country_code'] ); ?>"
 							   class="button button-small"><?php esc_html_e( 'Detail', 'meowpack' ); ?></a>
 						</td>
 					</tr>

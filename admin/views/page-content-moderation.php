@@ -98,6 +98,9 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 		<a href="?page=meowpack-content-moderation&tab=settings" class="nav-tab <?php echo 'settings' === $tab ? 'nav-tab-active' : ''; ?>">
 			⚙️ <?php esc_html_e( 'Pengaturan', 'meowpack' ); ?>
 		</a>
+		<a href="?page=meowpack-content-moderation&tab=cloud" class="nav-tab <?php echo 'cloud' === $tab ? 'nav-tab-active' : ''; ?>">
+			🌍 <?php esc_html_e( 'Cloud Sync', 'meowpack' ); ?>
+		</a>
 	</h2>
 
 	<?php if ( 'dictionary' === $tab ) : ?>
@@ -636,6 +639,54 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 			$('#scan-bar').css('width', percent + '%');
 			$('#scan-status').html(text);
 		}
+	</script>
+	<?php elseif ( 'cloud' === $tab ) : ?>
+	<!-- =====================================================================
+	     TAB: CLOUD SYNC
+	===================================================================== -->
+	<div class="meowpack-card" style="text-align:center; padding:40px;">
+		<div style="font-size:4em; margin-bottom:20px;">🌍</div>
+		<h2><?php esc_html_e( 'Sinkronisasi Kamus Cloud', 'meowpack' ); ?></h2>
+		<p class="description" style="max-width:600px; margin:0 auto 30px;">
+			<?php esc_html_e( 'Ambil daftar kata kunci malware, webshell, judi online, dan blacklist domain terbaru langsung dari repositori GitHub komunitas MeowPack.', 'meowpack' ); ?>
+		</p>
+
+		<div id="sync-status" style="margin-bottom:20px; font-weight:600; display:none;"></div>
+
+		<button type="button" id="btn-sync-cloud" class="button button-primary button-large">
+			🔄 <?php esc_html_e( 'Sinkronisasi Sekarang', 'meowpack' ); ?>
+		</button>
+
+		<div style="margin-top:40px; color:#6c7086; font-size:0.9em;">
+			<p><strong>Sumber Data:</strong><br>
+			GitHub: <code>akbarbahaulloh/meowpack</code></p>
+		</div>
+	</div>
+
+	<script>
+	jQuery(document).ready(function($) {
+		$('#btn-sync-cloud').on('click', function() {
+			const btn = $(this);
+			const status = $('#sync-status');
+
+			btn.prop('disabled', true).text('⌛ Sinkronisasi...');
+			status.show().html('⏳ Menghubungi GitHub...').css('color', '#cdd6f4');
+
+			$.post(ajaxurl, {
+				action: 'meowpack_sync_cloud',
+				nonce: '<?php echo esc_js( wp_create_nonce( "meowpack_sync_cloud" ) ); ?>'
+			}, function(res) {
+				btn.prop('disabled', false).text('🔄 Sinkronisasi Sekarang');
+				if (res.success) {
+					status.html(`✅ Berhasil! Mengimpor ${res.data.keywords} kata kunci dan ${res.data.domains} domain blacklist.`).css('color', '#a6e3a1');
+					if (res.data.errors.length > 0) {
+						console.error(res.data.errors);
+					}
+				} else {
+					status.html('❌ Gagal sinkronisasi: ' + res.data).css('color', '#f38ba8');
+				}
+			});
+		});
 	});
 	</script>
 	<?php endif; ?>

@@ -105,6 +105,10 @@ class MeowPack_Core {
 			new MeowPack_GitHub_Updater();
 		}
 
+		if ( class_exists( 'MeowPack_Malware_Scanner' ) ) {
+			new MeowPack_Malware_Scanner();
+		}
+
 		// Register REST API routes.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 

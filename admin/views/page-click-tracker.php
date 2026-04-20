@@ -10,8 +10,7 @@ $post_filter = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;
 $top_links   = MeowPack_Click_Tracker::get_top_links( 30, $post_filter );
 $by_post     = MeowPack_Click_Tracker::get_clicks_by_post( 10 );
 ?>
-<div class="wrap meowpack-wrap">
-	<h1>🔗 <?php esc_html_e( 'Pelacak URL Keluar', 'meowpack' ); ?></h1>
+<div>
 	<p class="description">
 		<?php esc_html_e( 'Link eksternal yang paling banyak diklik oleh pengunjung situs Anda.', 'meowpack' ); ?>
 	</p>
@@ -23,7 +22,7 @@ $by_post     = MeowPack_Click_Tracker::get_clicks_by_post( 10 );
 			<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
 				<h3 style="margin:0;"><?php esc_html_e( 'Top 30 URL Keluar', 'meowpack' ); ?></h3>
 				<?php if ( $post_filter ) : ?>
-					<a href="?page=meowpack-click-tracker" class="button button-small">
+					<a href="?page=meowpack&tab=clicks" class="button button-small">
 						<?php esc_html_e( '← Semua Halaman', 'meowpack' ); ?>
 					</a>
 				<?php endif; ?>
@@ -78,7 +77,7 @@ $by_post     = MeowPack_Click_Tracker::get_clicks_by_post( 10 );
 					?>
 					<tr>
 						<td>
-							<a href="?page=meowpack-click-tracker&post_id=<?php echo esc_attr( $post_id ); ?>">
+							<a href="?page=meowpack&tab=clicks&post_id=<?php echo esc_attr( $post_id ); ?>">
 								<?php echo esc_html( strlen( $post_title ) > 40 ? substr( $post_title, 0, 40 ) . '…' : $post_title ); ?>
 							</a>
 						</td>

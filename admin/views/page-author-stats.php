@@ -70,13 +70,12 @@ if ( ! empty( $author_rows ) ) {
 	}
 }
 ?>
-<div class="wrap meowpack-wrap">
-	<h1>✍️ <?php esc_html_e( 'Statistik Per Penulis', 'meowpack' ); ?></h1>
+<div>
 
 	<!-- Period tabs -->
 	<div style="margin-bottom:20px;">
 		<?php foreach ( $period_tabs as $key => $label ) : ?>
-			<a href="?page=meowpack-author-stats&period=<?php echo esc_attr( $key ); ?>"
+			<a href="?page=meowpack&tab=author&period=<?php echo esc_attr( $key ); ?>"
 			   class="button <?php echo $key === $period ? 'button-primary' : ''; ?>"
 			   style="margin-right:6px;"><?php echo esc_html( $label ); ?></a>
 		<?php endforeach; ?>

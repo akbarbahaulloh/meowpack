@@ -51,6 +51,9 @@ class MeowPack_Content_Moderation {
 
 		// AJAX handler for manual scanner.
 		add_action( 'wp_ajax_meowpack_manual_scan', array( $this, 'ajax_manual_scan' ) );
+
+		// AJAX handler for cloud dictionary sync.
+		add_action( 'wp_ajax_meowpack_sync_cloud', array( $this, 'ajax_sync_cloud' ) );
 	}
 
 	// -----------------------------------------------------------------------
@@ -122,7 +125,53 @@ class MeowPack_Content_Moderation {
 			}
 		}
 
+		// Also check for blacklisted domains.
+		$domain_match = $this->check_domains( $text );
+		if ( $domain_match ) {
+			return array(
+				'keyword'    => $domain_match,
+				'category'   => 'gambling',
+				'action'     => 'hold',
+				'match_mode' => 'domain'
+			);
+		}
+
 		return null;
+	}
+
+	/**
+	 * Scans text for URLs and checks if the domains are on the blacklist.
+	 *
+	 * @param string $text Content to scan.
+	 * @return string|false Domain string if found, false otherwise.
+	 */
+	public function check_domains( $text ) {
+		$blacklist = get_option( 'meowpack_domain_blacklist', array() );
+		if ( empty( $blacklist ) || ! is_array( $blacklist ) ) {
+			return false;
+		}
+
+		// Regex to find URLs.
+		preg_match_all( '#\bhttps?://[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|/))#', $text, $matches );
+		if ( empty( $matches[0] ) ) {
+			return false;
+		}
+
+		foreach ( $matches[0] as $url ) {
+			$host = parse_url( $url, PHP_URL_HOST );
+			if ( ! $host ) continue;
+
+			$host = strtolower( ltrim( $host, 'www.' ) );
+
+			foreach ( $blacklist as $bad_domain ) {
+				$bad_domain = strtolower( ltrim( $bad_domain, 'www.' ) );
+				if ( $host === $bad_domain || str_ends_with( $host, '.' . $bad_domain ) ) {
+					return $host;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**

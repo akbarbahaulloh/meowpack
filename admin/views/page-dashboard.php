@@ -12,10 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $stats = MeowPack_Core::get_instance()->stats;
 ?>
-<div class="wrap meowpack-admin" id="meowpack-dashboard">
-	<h1 class="meowpack-page-title">
-		<span class="meowpack-logo">🐾</span> MeowPack — Dashboard
-	</h1>
+<div id="meowpack-dashboard">
 
 	<!-- Overview Cards -->
 	<div class="meowpack-cards">

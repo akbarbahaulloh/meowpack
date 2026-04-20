@@ -50,23 +50,19 @@ class MeowPack_Admin {
 			__( 'MeowPack', 'meowpack' ),
 			'manage_options',
 			'meowpack',
-			array( $this, 'page_dashboard' ),
+			array( $this, 'page_stats' ),
 			'data:image/svg+xml;base64,' . base64_encode( '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#a7aaad"/></svg>' ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-			25
+			2.2
 		);
 
-		add_submenu_page( 'meowpack', __( 'Dashboard', 'meowpack' ),           __( 'Dashboard', 'meowpack' ),           'manage_options', 'meowpack',                     array( $this, 'page_dashboard' ) );
+		add_submenu_page( 'meowpack', __( 'Statistik', 'meowpack' ),           __( 'Statistik', 'meowpack' ),           'manage_options', 'meowpack',                     array( $this, 'page_stats' ) );
 		add_submenu_page( 'meowpack', __( 'Pengaturan', 'meowpack' ),          __( 'Pengaturan', 'meowpack' ),          'manage_options', 'meowpack-settings',            array( $this, 'page_settings' ) );
 		add_submenu_page( 'meowpack', __( 'Auto Share', 'meowpack' ),          __( 'Auto Share', 'meowpack' ),          'manage_options', 'meowpack-autoshare',           array( $this, 'page_autoshare' ) );
-		// v2.0.0 new pages.
-		add_submenu_page( 'meowpack', __( '📱 Device & Browser', 'meowpack' ), __( '📱 Device & Browser', 'meowpack' ), 'manage_options', 'meowpack-device-stats',         array( $this, 'page_device_stats' ) );
-		add_submenu_page( 'meowpack', __( '🌏 Lokasi', 'meowpack' ),           __( '🌏 Lokasi', 'meowpack' ),           'manage_options', 'meowpack-location-stats',      array( $this, 'page_location_stats' ) );
-		add_submenu_page( 'meowpack', __( '✍️ Per Penulis', 'meowpack' ),      __( '✍️ Per Penulis', 'meowpack' ),      'manage_options', 'meowpack-author-stats',        array( $this, 'page_author_stats' ) );
-		add_submenu_page( 'meowpack', __( '🔗 URL Keluar', 'meowpack' ),       __( '🔗 URL Keluar', 'meowpack' ),       'manage_options', 'meowpack-click-tracker',      array( $this, 'page_click_tracker' ) );
 		add_submenu_page( 'meowpack', __( '🤖 AI Bot Manager', 'meowpack' ),   __( '🤖 AI Bot Manager', 'meowpack' ),   'manage_options', 'meowpack-bot-manager',        array( $this, 'page_bot_manager' ) );
 		add_submenu_page( 'meowpack', __( '🛡️ Anti-Hotlink', 'meowpack' ),          __( '🛡️ Anti-Hotlink', 'meowpack' ),          'manage_options', 'meowpack-hotlink',               array( $this, 'page_hotlink' ) );
 		add_submenu_page( 'meowpack', __( '🔐 Captcha', 'meowpack' ),               __( '🔐 Captcha', 'meowpack' ),               'manage_options', 'meowpack-captcha',              array( $this, 'page_captcha' ) );
 		add_submenu_page( 'meowpack', __( '🚫 Filter Konten', 'meowpack' ),         __( '🚫 Filter Konten', 'meowpack' ),         'manage_options', 'meowpack-content-moderation',  array( $this, 'page_content_moderation' ) );
+		add_submenu_page( 'meowpack', __( '🛡️ Malware Scanner', 'meowpack' ),        __( '🛡️ Malware Scanner', 'meowpack' ),        'manage_options', 'meowpack-malware-scanner',      array( $this, 'page_malware_scanner' ) );
 		add_submenu_page( 'meowpack', __( 'Import Jetpack', 'meowpack' ),           __( 'Import Jetpack', 'meowpack' ),           'manage_options', 'meowpack-importer',             array( $this, 'page_importer' ) );
 	}
 
@@ -89,7 +85,8 @@ class MeowPack_Admin {
 			'meowpack_page_meowpack-bot-manager',
 			'meowpack_page_meowpack-hotlink',
 			'meowpack_page_meowpack-captcha',
-			'meowpack_page_meowpack-content-moderation',  // v2.1.0
+			'meowpack_page_meowpack-content-moderation',
+			'meowpack_page_meowpack-malware-scanner',
 		);
 
 		if ( ! in_array( $hook, $meowpack_pages, true ) ) {
@@ -475,14 +472,28 @@ class MeowPack_Admin {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Dashboard page.
+	 * Consolidated Statistics page (with tabs).
+	 */
+	public function page_stats() {
+		require_once MEOWPACK_DIR . 'admin/views/page-stats.php';
+	}
+
+	/**
+	 * Dashboard view loader (now loaded via page_stats).
 	 */
 	public function page_dashboard() {
 		require_once MEOWPACK_DIR . 'admin/views/page-dashboard.php';
 	}
 
 	/**
-	 * General settings page.
+	 * Callback for Malware Scanner page.
+	 */
+	public function page_malware_scanner() {
+		include MEOWPACK_PATH . 'admin/views/page-malware-scanner.php';
+	}
+
+	/**
+	 * Callback for Stats page.
 	 */
 	public function page_settings() {
 		require_once MEOWPACK_DIR . 'admin/views/page-settings.php';
