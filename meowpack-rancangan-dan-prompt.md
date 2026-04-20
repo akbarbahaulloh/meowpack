@@ -23,7 +23,10 @@ MeowPack adalah plugin WordPress ringan pengganti Jetpack yang menyimpan semua d
 - Honeypot endpoint tersembunyi
 - Deteksi headless browser (tidak ada JavaScript execution)
 - Referrer spam filter
-- Daftar bot bisa dikustomisasi admin
+- Daftar bot umum (crawlers) bisa dikustomisasi admin
+- **[BARU]** Daftar terpisah AI bots: GPTBot, ClaudeBot, PerplexityBot, CCBot, Google-Extended, Amazonbot, dll.
+- **[BARU]** Opsi blokir per-bot (return 403) atau hanya catat di statistik
+- **[BARU]** Dashboard statistik bot: bot apa saja yang paling sering berkunjung, frekuensi, halaman yang dikunjungi
 
 #### 3. Modul Statistik Admin
 Halaman admin WordPress dengan:
@@ -35,12 +38,24 @@ Halaman admin WordPress dengan:
 - Pengunjung unik vs total pageview
 - Data real-time (hari ini) + historical
 - Export data CSV
+- **[BARU]** Statistik jenis device: Mobile / Tablet / Desktop (pie chart)
+- **[BARU]** Statistik browser: Chrome, Firefox, Safari, Edge, dll.
+- **[BARU]** Statistik sistem operasi: Windows, Android, iOS, macOS, dll.
+- **[BARU]** Statistik lokasi: negara → wilayah/provinsi → kota (drill-down)
+- **[BARU]** Statistik per penulis (author): artikel dan views per author
+- **[BARU]** Halaman paling banyak dilihat (detailed, dengan filter periode)
+- **[BARU]** URL keluar yang paling banyak diklik (outbound link tracking)
+- **[BARU]** Rata-rata waktu baca per halaman (reading time heatmap)
+- **[BARU]** Statistik bot visitor: bot name, frekuensi, halaman dikunjungi
 
 #### 4. Lacak Sumber Kunjungan
 - Parse HTTP Referrer header
 - UTM parameter support (utm_source, utm_medium, utm_campaign)
 - Kategori otomatis: Direct (tidak ada referrer), Search (dari search engine), Social (dari sosmed), Referral (dari website lain), Email (dari email client)
-- Deteksi country via IP (tanpa API eksternal — gunakan library MaxMind GeoIP2 Lite lokal)
+- **[DIPERBARUI]** Deteksi lokasi via IP: negara + wilayah/provinsi + kota (gunakan MaxMind GeoLite2-City, bukan hanya GeoLite2-Country)
+- **[BARU]** Deteksi jenis device dari User-Agent: Mobile / Tablet / Desktop
+- **[BARU]** Deteksi browser dan sistem operasi dari User-Agent (parsing library ringan, tidak pakai API)
+- **[BARU]** Catat author_id dari post yang dikunjungi untuk statistik per penulis
 
 #### 5. Auto Share ke Sosial Media
 Platform yang didukung:
@@ -100,41 +115,359 @@ Widget sidebar/footer yang menampilkan:
 
 ---
 
+#### 10. [BARU] Statistik Device, Browser & OS
+Buat class `MeowPack_DeviceDetector`:
+- Parse User-Agent string menggunakan library ringan PHP (tanpa dependency besar)
+- Kategori device: **Mobile**, **Tablet**, **Desktop**, **Bot**
+- Deteksi browser: Chrome, Firefox, Safari, Edge, Opera, Samsung Browser, dll.
+- Deteksi OS: Windows, macOS, Android, iOS, Linux, Chrome OS, dll.
+- Simpan ke kolom tambahan di `meow_visits`: `device_type`, `browser`, `os`
+- Tampilkan di dashboard: 3 donut chart (device / browser / OS)
+- Filter statistik berdasarkan device (contoh: lihat pageview hanya dari mobile)
+
+#### 11. [BARU] Statistik Lokasi (Negara, Wilayah, Kota)
+Perbarui modul GeoIP:
+- Gunakan **MaxMind GeoLite2-City** (bukan hanya Country) — file database `.mmdb` disimpan lokal
+- Kolom di `meow_visits`: `country_code`, `region` (provinsi/state), `city`
+- Dashboard: tabel top countries, top regions, top cities
+- Peta dunia interaktif opsional (gunakan library ringan seperti `jsvectormap`)
+- Auto-download/update file GeoIP2-City via cron bulanan (dari MaxMind jika punya lisensi; fallback: DB111-City gratis dari db-ip.com)
+
+#### 12. [BARU] Pelacakan URL Keluar (Outbound Click Tracking)
+Buat class `MeowPack_ClickTracker`:
+- Inject JavaScript kecil yang menangkap klik pada link eksternal (link dengan domain berbeda)
+- Kirim data via AJAX ke endpoint `wp-json/meowpack/v1/click`: `url`, `post_id`, `anchor_text`
+- Simpan ke tabel `meow_click_logs`: `post_id`, `url`, `anchor_text`, `click_count`, `last_clicked`
+- Dashboard: Top 20 URL keluar yang paling banyak diklik
+- Filter: per halaman/artikel, per periode waktu
+- Opsi aktifkan/nonaktifkan per post type
+- **Ide bonus**: tandai link afiliasi (URL mengandung `/ref=`, `?aff=`, dll.) secara terpisah
+
+#### 13. [BARU] Statistik Per Penulis (Author Stats)
+- Tambahkan kolom `author_id` di `meow_visits` (ambil dari `$post->post_author`)
+- Tambahkan kolom `author_id` di agregasi `meow_daily_stats`
+- Dashboard sub-halaman "Per Penulis": daftar author dengan total views, unique visitors, artikel terpopuler
+- Shortcode `[meowpack_author_stats author_id="1"]` untuk tampilan publik profil penulis
+- Kompatibel dengan multi-author blog
+
+#### 14. [BARU] Waktu Baca & Scroll Depth
+Buat class `MeowPack_ReadingTime`:
+- **Estimasi waktu baca** (calculated): hitung dari jumlah kata artikel → tampilkan "5 menit baca" di bawah judul
+  - Formula: jumlah kata ÷ 200 (rata-rata WPM orang Indonesia)
+  - Shortcode `[meowpack_reading_time]` atau otomatis via filter `the_content`
+- **Waktu aktual di halaman**: JavaScript kirim sinyal every 30 detik selama user aktif di halaman
+  - Simpan ke `meow_visits`: kolom `time_on_page` (dalam detik)
+  - Dashboard: rata-rata waktu baca per artikel (sorted: artikel dengan engagement tinggi)
+- **Scroll depth**: rekam seberapa jauh user scroll (25%, 50%, 75%, 100%)
+  - Simpan ke `meow_visits`: kolom `scroll_depth` (0-100)
+  - Dashboard: "artikel dengan scroll depth rendah" = indikator konten kurang menarik
+- Semua ini non-blocking: gunakan `requestIdleCallback` + beacon API
+
+#### 15. [BARU] AI Bot Manager
+Buat class `MeowPack_AIBotManager`:
+
+**15a. Daftar AI Bot**
+Daftar default AI bots yang dikenali (bisa dikustomisasi admin):
+| Bot Name | User-Agent String |
+|---|---|
+| OpenAI GPTBot | `GPTBot` |
+| OpenAI ChatGPT-User | `ChatGPT-User` |
+| Anthropic ClaudeBot | `ClaudeBot`, `anthropic-ai` |
+| Google Gemini | `Google-Extended` |
+| Perplexity | `PerplexityBot` |
+| Common Crawl | `CCBot` |
+| Amazon Alexa | `Amazonbot` |
+| Meta AI | `FacebookBot` |
+| Apple Applebot-Extended | `Applebot-Extended` |
+| Bytedance | `Bytespider` |
+| Diffbot | `Diffbot` |
+| Cohere | `cohere-ai` |
+| You.com | `YouBot` |
+| Timpibot | `Timpibot` |
+| Omgili | `omgilibot` |
+| DataForSEO | `DataForSeoBot` |
+| Scrapy | `Scrapy` |
+
+**15b. Mode Per-Bot**
+Untuk setiap bot, admin bisa memilih:
+- `allow` — izinkan, catat di statistik saja
+- `stats_only` — sama seperti allow tapi tandai di laporan sebagai "AI bot"
+- `block` — return HTTP 403 Forbidden
+- `block_redirect` — redirect ke halaman tertentu (misal: halaman kebijakan penggunaan AI)
+
+**15c. Dashboard Statistik Bot**
+- Tabel: nama bot, jumlah kunjungan hari ini/bulan ini/all-time, halaman yang paling sering dikunjungi
+- Grafik tren bot traffic vs human traffic
+- Tombol cepat "Blokir Bot Ini" langsung dari tabel statistik
+- Log detail kunjungan bot: IP (hash), user-agent, halaman, waktu
+
+**15d. Implementasi Blocking**
+- Hook ke `init` — cek user-agent di awal request, sebelum WordPress load penuh
+- Untuk blocking: return `wp_die('403 Forbidden', 'Access Denied', ['response' => 403])`
+- Opsi tambahan: update `robots.txt` via filter `robots_txt` untuk Disallow bot tertentu
+- Jangan blokir bot search engine (Google, Bing) secara default — hanya AI scraper
+
+#### 16. [BARU] Anti-Hotlink Protection
+Buat class `MeowPack_AntiHotlink`:
+
+**Cara Kerja:**
+- Hook ke request gambar (jpg/jpeg/png/gif/webp/svg)
+- Cek HTTP Referer header:
+  - Jika Referer kosong → **izinkan** (download langsung, bookmarks, dll.)
+  - Jika Referer = domain sendiri → **izinkan**
+  - Jika Referer = domain lain → **blokir** (hotlink)
+
+**Metode Implementasi (pilih salah satu, bisa kombinasi):**
+1. **PHP handler** via `add_rewrite_rule` + WordPress endpoint — lebih portable
+2. **Modifikasi .htaccess** via WordPress API (`insert_with_markers()`) — lebih efisien di Apache
+3. **Nginx config snippet** — tampilkan di settings untuk server Nginx
+
+**Opsi Admin:**
+- Whitelist domain tertentu (misal: izinkan Google Images, Bing, Facebook crawler)
+- Pilih ekstensi file yang dilindungi (default: jpg, jpeg, png, gif, webp)
+- Pilih respons saat terdeteksi hotlink:
+  - **Gambar placeholder** ("No Hotlinking" image yang bisa dikustomisasi)
+  - **HTTP 403**
+  - **Redirect ke URL tertentu**
+- Statistik: berapa kali hotlink diblokir, dari domain mana
+- Jangan lindungi file di direktori lain selain `/wp-content/uploads/`
+
+**Catatan Penting:**
+- Pastikan tidak blokir media dari CDN sendiri jika menggunakan CDN
+- Whitelist otomatis: `*.googleusercontent.com`, `*.fbcdn.net` (Facebook preview), `*.whatsapp.net`
+
+#### 17. [BARU] Simple Captcha (Anti-Spam)
+Buat class `MeowPack_Captcha`:
+
+**Jenis Captcha yang Tersedia:**
+1. **Math Captcha** (default) — Penjumlahan/pengurangan angka sederhana, contoh: "Berapa hasil 4 + 7?"
+2. **Text Captcha** — Pertanyaan logis sederhana, contoh: "Warna langit di siang hari?"
+3. **Honeypot field** — Field tersembunyi via CSS, bot mengisi → ditolak (tidak terlihat user)
+
+**Lokasi Penerapan (bisa dipilih di settings):**
+- ✅ Form komentar WordPress
+- ✅ Form login WordPress
+- ✅ Form register WordPress
+- ✅ Form lupa password
+- ✅ Form WooCommerce checkout (jika WooCommerce aktif)
+- ✅ Integrasi Contact Form 7 (via filter hook)
+
+**Implementasi Math Captcha:**
+```php
+// Generate soal
+$a = rand(1, 20);
+$b = rand(1, 20);
+$op = (rand(0, 1)) ? '+' : '-';
+$answer = ($op === '+') ? ($a + $b) : ($a - $b);
+set_transient('meow_captcha_' . session_id(), $answer, 600); // 10 menit
+// Tampilkan: "Berapa 12 + 5? [___]"
+```
+
+**Apakah Math Captcha Aman?**
+> ✅ **Cukup aman untuk spam biasa** — efektif memblokir spam bot generik
+> ⚠️ **Tidak aman dari bot canggih** — AI bisa membacanya dengan mudah
+> 💡 **Rekomendasi**: Kombinasikan Math Captcha + Honeypot untuk perlindungan berlapis tanpa mengorbankan UX
+> 🔒 **Jika butuh keamanan tinggi**: Tambahkan opsi integrasi **Cloudflare Turnstile** (gratis, privacy-friendly, tidak ada "pilih semua traffic light")
+
+**Perbandingan Captcha:**
+| Metode | Kemudahan User | Keamanan | Privacy | Eksternal? |
+|---|---|---|---|---|
+| Math Captcha | ⭐⭐⭐⭐⭐ | ⭐⭐ | ✅ Lokal | ❌ |
+| Honeypot | ⭐⭐⭐⭐⭐ (tak terlihat) | ⭐⭐⭐ | ✅ Lokal | ❌ |
+| Math + Honeypot | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ✅ Lokal | ❌ |
+| Cloudflare Turnstile | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ✅ CF | ✅ |
+| reCAPTCHA v3 | ⭐⭐⭐⭐⭐ (invisible) | ⭐⭐⭐⭐ | ❌ Google | ✅ |
+
+#### 18. [BARU] Filter Konten Berbahaya (Content Moderation)
+Buat class `MeowPack_Content_Moderation`:
+
+**Apa itu?**
+Sistem deteksi kata kunci berbahaya di komentar, konten post, judul, dan username. Admin bisa membuat "kamus" kata kunci per kategori dan menentukan aksi otomatis saat terdeteksi.
+
+**Kategori Bawaan (seed keywords Bahasa Indonesia):**
+| Kategori | Contoh Kata Kunci |
+|---|---|
+| 🎰 Judi / Gambling | slot, judi online, togel, bet, casino, poker, bandar, taruhan, gacor, maxwin |
+| 💊 Obat Terlarang | obat penggugur kandungan, aborsi, narkoba, sabu, ganja, tramadol, pil bius |
+| 🔞 Pornografi | (daftar tersembunyi — dikelola di admin) |
+| 🩸 Kekerasan | bom, bunuh, teror, jihad (konteks kekerasan), ancam |
+| 💸 Penipuan / Scam | pinjol ilegal, investasi bodong, money game, arisan online, transfer dulu |
+| ⚠️ SARA | (konfigurasi sensitif — kosong by default, admin isi sendiri) |
+| 📦 Kustom | kata kunci tambahan buatan admin |
+
+**Target Pemindaian (Otomatis):**
+- ✅ **Komentar baru** — paling umum, default aktif
+- ✅ **Username saat registrasi** — cegah username seperti "slot_gacor_2024"
+- ⬜ **Konten post saat dipublish** — scan isi artikel baru (off by default, berat)
+- ⬜ **Judul post** — scan judul artikel
+- ⬜ **Excerpt / ringkasan**
+
+**Scanner Manual (Pemindaian Menyeluruh On-Demand):**
+Jika website pernah diretas/disusupi (injected SEO spam), fitur ini memungkinkan admin melakukan pemindaian menyeluruh ke database lama. Berjalan via AJAX (batch processing) agar tidak timeout:
+1. **Pos & Halaman (Posts & Pages)**: Scan `post_title` dan `post_content`.
+2. **Komentar Lama**: Scan seluruh isi tabel komentar.
+3. **Menu Navigasi**: Scan tipe post `nav_menu_item`.
+4. **Gambar / Attachment**: Scan teks alt, deskripsi, dan judul attachment gambar.
+5. **Widget (Sidebar/Footer)**: Scan tabel `wp_options` untuk widget text, HTML, dan block.
+
+**Aksi saat Terdeteksi:**
+- `hold` — tahan untuk review manual (komentar masuk ke antrian moderasi)
+- `block` — tolak langsung (komentar gagal, konten tidak dipublish)
+- `flag` — izinkan lewat tapi tandai dan notifikasi admin via email
+- `replace` — ganti kata dengan *** (sensor otomatis)
+
+**Fitur Admin:**
+- Tabel kamus: per kategori, bisa tambah/edit/hapus keyword
+- Import/Export kamus (format CSV atau JSON)
+- Log deteksi: kapan, di mana (post ID), kata apa yang ditemukan, konten lengkap, aksi yang diambil
+- Statistik: kategori apa yang paling banyak terdeteksi
+- Mode "Strict" vs "Loose" (strict: substring match; loose: hanya whole-word match)
+- Opsi false-positive handling: whitelist kata tertentu (contoh: "slot" di konteks elektronik)
+
+**Database:**
+```sql
+-- Kamus kata kunci moderat
+CREATE TABLE meow_content_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  keyword VARCHAR(200) NOT NULL,
+  category VARCHAR(50) NOT NULL DEFAULT 'custom',
+  action VARCHAR(20) NOT NULL DEFAULT 'hold',
+  match_mode VARCHAR(10) DEFAULT 'substring',  -- substring|word
+  is_active TINYINT DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Log deteksi
+CREATE TABLE meow_content_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  context VARCHAR(30) NOT NULL,  -- comment|post|username
+  object_id BIGINT DEFAULT 0,    -- comment_id atau post_id
+  matched_keyword VARCHAR(200),
+  matched_category VARCHAR(50),
+  action_taken VARCHAR(20),
+  content_excerpt TEXT,          -- 200 karakter pertama konten
+  INDEX idx_date (detected_at),
+  INDEX idx_context (context),
+  INDEX idx_category (matched_category)
+);
+```
+
+**Implementasi Komentar:**
+- Hook `preprocess_comment` — scan sebelum komentar disimpan
+- Jika `hold`: set `comment_approved = 0` (masuk antrian)
+- Jika `block`: `wp_die()` dengan pesan yang sopan
+- Jika `replace`: ganti kata dengan `***` lalu simpan
+
+---
+
 ### Struktur Database
 
 ```sql
 -- Kunjungan mentah (disimpan 30 hari, lalu diagregasi)
+-- [DIPERBARUI] Ditambah kolom baru untuk fitur statistik lanjutan
 CREATE TABLE meow_visits (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   post_id BIGINT NOT NULL DEFAULT 0,
+  author_id BIGINT DEFAULT 0,            -- [BARU] ID penulis artikel
   visit_date DATE NOT NULL,
   visit_hour TINYINT NOT NULL,
-  ip_hash VARCHAR(64) NOT NULL,  -- hash IP untuk privasi
-  source_type VARCHAR(20),       -- direct/search/social/referral/email
-  source_name VARCHAR(100),      -- google, facebook, dll.
+  ip_hash VARCHAR(64) NOT NULL,          -- hash SHA256(IP + salt)
+  source_type VARCHAR(20),               -- direct/search/social/referral/email
+  source_name VARCHAR(100),              -- google, facebook, dll.
   utm_source VARCHAR(100),
   utm_medium VARCHAR(100),
   utm_campaign VARCHAR(100),
   country_code CHAR(2),
+  region VARCHAR(100),                   -- [BARU] provinsi/state
+  city VARCHAR(100),                     -- [BARU] kota
+  device_type VARCHAR(20),               -- [BARU] mobile/tablet/desktop
+  browser VARCHAR(50),                   -- [BARU] Chrome, Firefox, Safari, dll.
+  os VARCHAR(50),                        -- [BARU] Windows, Android, iOS, dll.
+  time_on_page SMALLINT UNSIGNED,        -- [BARU] detik aktif di halaman
+  scroll_depth TINYINT UNSIGNED,         -- [BARU] 0-100 persen scroll
   is_bot TINYINT DEFAULT 0,
+  bot_name VARCHAR(100),                 -- [BARU] nama bot jika is_bot=1
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_post_date (post_id, visit_date),
-  INDEX idx_date (visit_date)
+  INDEX idx_date (visit_date),
+  INDEX idx_author (author_id),          -- [BARU]
+  INDEX idx_device (device_type),        -- [BARU]
+  INDEX idx_country (country_code)       -- [BARU]
 );
 
 -- Agregasi harian (dipertahankan selamanya)
+-- [DIPERBARUI] Ditambah kolom author dan device
 CREATE TABLE meow_daily_stats (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   stat_date DATE NOT NULL,
-  post_id BIGINT NOT NULL DEFAULT 0,  -- 0 = site-wide
+  post_id BIGINT NOT NULL DEFAULT 0,     -- 0 = site-wide
+  author_id BIGINT DEFAULT 0,            -- [BARU] 0 = site-wide
   unique_visitors INT DEFAULT 0,
   total_views INT DEFAULT 0,
   source_direct INT DEFAULT 0,
   source_search INT DEFAULT 0,
   source_social INT DEFAULT 0,
   source_referral INT DEFAULT 0,
+  mobile_views INT DEFAULT 0,            -- [BARU]
+  tablet_views INT DEFAULT 0,            -- [BARU]
+  desktop_views INT DEFAULT 0,           -- [BARU]
+  avg_time_on_page SMALLINT DEFAULT 0,   -- [BARU] rata-rata detik
+  avg_scroll_depth TINYINT DEFAULT 0,    -- [BARU] rata-rata scroll %
   UNIQUE KEY unique_date_post (stat_date, post_id),
   INDEX idx_date (stat_date)
+);
+
+-- [BARU] Log klik URL keluar (outbound links)
+CREATE TABLE meow_click_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL DEFAULT 0,
+  url TEXT NOT NULL,
+  url_hash VARCHAR(64) NOT NULL,         -- hash URL untuk indexing
+  anchor_text VARCHAR(255),
+  click_count INT DEFAULT 1,
+  last_clicked DATETIME,
+  UNIQUE KEY unique_url_post (url_hash, post_id),
+  INDEX idx_post (post_id),
+  INDEX idx_click_count (click_count)
+);
+
+-- [BARU] Statistik dan aturan bot
+CREATE TABLE meow_bot_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  bot_name VARCHAR(100) NOT NULL,        -- nama display bot
+  user_agent_pattern VARCHAR(200) NOT NULL, -- string untuk deteksi
+  bot_type VARCHAR(20) DEFAULT 'crawler', -- crawler/ai_bot/spam
+  action VARCHAR(20) DEFAULT 'allow',    -- allow/stats_only/block/block_redirect
+  redirect_url VARCHAR(500),             -- jika action=block_redirect
+  is_active TINYINT DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_bot (user_agent_pattern)
+);
+
+-- [BARU] Statistik kunjungan bot (agregasi harian)
+CREATE TABLE meow_bot_stats (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  stat_date DATE NOT NULL,
+  bot_name VARCHAR(100) NOT NULL,
+  bot_type VARCHAR(20),
+  visit_count INT DEFAULT 0,
+  unique_ips INT DEFAULT 0,              -- jumlah IP unik
+  top_pages TEXT,                        -- JSON: array URL paling banyak dikunjungi
+  UNIQUE KEY unique_date_bot (stat_date, bot_name),
+  INDEX idx_date (stat_date)
+);
+
+-- [BARU] Log hotlink yang diblokir
+CREATE TABLE meow_hotlink_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  blocked_url VARCHAR(500),              -- URL gambar yang dicoba di-hotlink
+  referrer_domain VARCHAR(200),          -- domain yang mencoba hotlink
+  blocked_date DATE NOT NULL,
+  block_count INT DEFAULT 1,
+  last_blocked DATETIME,
+  UNIQUE KEY unique_url_domain (blocked_url(200), referrer_domain),
+  INDEX idx_date (blocked_date)
 );
 
 -- Log auto share
@@ -188,22 +521,38 @@ meowpack/
 ├── meowpack.php              (main plugin file)
 ├── uninstall.php
 ├── includes/
+│   ├── class-meowpack-database.php
 │   ├── class-meowpack-core.php
+│   ├── class-meowpack-bot-filter.php      (crawler bots)
+│   ├── class-meowpack-ai-bot-manager.php  [BARU] AI bot blocking & stats
 │   ├── class-meowpack-tracker.php
-│   ├── class-meowpack-bot-filter.php
+│   ├── class-meowpack-device-detector.php [BARU] device/browser/OS parser
 │   ├── class-meowpack-stats.php
+│   ├── class-meowpack-click-tracker.php   [BARU] outbound link tracking
 │   ├── class-meowpack-autoshare.php
 │   ├── class-meowpack-share-buttons.php
 │   ├── class-meowpack-view-counter.php
+│   ├── class-meowpack-reading-time.php    [BARU] reading time & scroll depth
 │   ├── class-meowpack-widget.php
-│   ├── class-meowpack-importer.php
-│   └── class-meowpack-database.php
+│   ├── class-meowpack-anti-hotlink.php    [BARU] hotlink protection
+│   ├── class-meowpack-captcha.php         [BARU] simple captcha
+│   └── class-meowpack-importer.php
+│   └── data/
+│       ├── geoip/                         [BARU] folder database GeoLite2-City.mmdb
+│       └── bot-list.php                   [BARU] daftar default AI bots
 ├── admin/
 │   ├── class-meowpack-admin.php
 │   ├── views/
 │   │   ├── dashboard.php
+│   │   ├── page-device-stats.php          [BARU]
+│   │   ├── page-location-stats.php        [BARU]
+│   │   ├── page-author-stats.php          [BARU]
+│   │   ├── page-click-tracker.php         [BARU]
+│   │   ├── page-bot-manager.php           [BARU]
+│   │   ├── page-hotlink.php               [BARU]
 │   │   ├── settings-general.php
 │   │   ├── settings-autoshare.php
+│   │   ├── settings-captcha.php           [BARU]
 │   │   ├── settings-widgets.php
 │   │   └── importer.php
 │   └── assets/
@@ -212,7 +561,7 @@ meowpack/
 ├── public/
 │   ├── class-meowpack-public.php
 │   └── assets/
-│       ├── meowpack-tracker.js   (< 3KB, async)
+│       ├── meowpack-tracker.js   (< 5KB, async — ditambah reading time & click tracker)
 │       └── share-buttons.css
 └── languages/
     └── meowpack-id_ID.po

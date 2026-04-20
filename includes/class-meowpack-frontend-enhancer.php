@@ -1,0 +1,229 @@
+<?php
+/**
+ * Frontend Enhancer — Post Meta Bar, Table of Contents, Related Posts.
+ *
+ * @package MeowPack
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class MeowPack_Frontend_Enhancer {
+
+	public function __construct() {
+		// Hook late to ensure we run after standard formatting.
+		add_filter( 'the_content', array( $this, 'enhance_content' ), 90 );
+		add_shortcode( 'meow_toc', array( $this, 'shortcode_toc' ) );
+	}
+
+	/**
+	 * Main entrance point for enhancing post content.
+	 */
+	public function enhance_content( $content ) {
+		if ( ! is_single() || ! in_the_loop() || ! is_main_query() ) {
+			return $content;
+		}
+
+		$post_id = get_the_ID();
+
+		// 1. Table of Contents
+		$toc_mode = MeowPack_Database::get_setting( 'show_toc', 'auto' );
+		$toc_html = '';
+		if ( 'hidden' !== $toc_mode ) {
+			$toc_data = $this->generate_toc( $content );
+			if ( $toc_data['has_toc'] ) {
+				$content  = $toc_data['content']; // content with added IDs.
+				$toc_html = $this->build_toc_html( $toc_data['items'] );
+			}
+		}
+
+		// Inject Auto ToC
+		if ( 'auto' === $toc_mode && $toc_html ) {
+			// Prepend before first H2
+			$content = preg_replace( '/(<h2.*?>)/i', $toc_html . '$1', $content, 1 );
+			// If no H2 was found, just prepend it at top
+			if ( strpos( $content, 'meowpack-toc' ) === false ) {
+				$content = $toc_html . $content;
+			}
+		}
+
+		// 2. Post Meta Bar (Views + Reading Time)
+		$meta_mode = MeowPack_Database::get_setting( 'show_post_meta_bar', 'top' );
+		if ( 'hidden' !== $meta_mode ) {
+			$meta_html = $this->build_post_meta_html( $content, $post_id );
+			if ( 'top' === $meta_mode ) {
+				$content = $meta_html . $content;
+			} else {
+				$content = $content . $meta_html;
+			}
+		}
+
+		// 3. Related Posts
+		$related_mode = MeowPack_Database::get_setting( 'enable_related_posts', '1' );
+		if ( '1' === $related_mode ) {
+			$content .= $this->build_related_posts_html( $post_id );
+		}
+
+		return $content;
+	}
+
+	/**
+	 * Build the Post Meta Bar (Views + Estimated Reading Time).
+	 */
+	private function build_post_meta_html( $content, $post_id ) {
+		// Get views from DB
+		global $wpdb;
+		$views = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT SUM(views) FROM {$wpdb->prefix}meow_daily_stats WHERE post_id = %d",
+			$post_id
+		) );
+
+		// Calculate WPM
+		$word_count = str_word_count( wp_strip_all_tags( $content ) );
+		$wpm = 200;
+		$minutes = max( 1, ceil( $word_count / $wpm ) );
+
+		$views_txt   = number_format_i18n( $views ) . ' ' . esc_html__( 'Dilihat', 'meowpack' );
+		$reading_txt = sprintf( esc_html__( 'Estimasi Baca: %d Menit', 'meowpack' ), $minutes );
+
+		return '<div class="meowpack-post-meta" style="display:flex; gap:16px; padding:12px 16px; background:rgba(0,0,0,0.03); border-radius:8px; margin:20px 0; font-size:0.9em; font-weight:500;">
+			<span title="Berdasarkan lalu lintas pengunjung">📈 ' . esc_html( $views_txt ) . '</span>
+			<span title="Berdasarkan 200 kata per menit">⏱️ ' . esc_html( $reading_txt ) . '</span>
+		</div>';
+	}
+
+	/**
+	 * Parse content for H2 and H3 tags and assign random IDs if missing.
+	 *
+	 * @return array { has_toc: bool, content: string, items: array }
+	 */
+	private function generate_toc( $content ) {
+		$items = array();
+		
+		// Match H2 and H3.
+		if ( preg_match_all( '/<(h[23])([^>]*)>(.*?)<\/\1>/i', $content, $matches, PREG_SET_ORDER ) ) {
+			foreach ( $matches as $match ) {
+				$tag   = strtolower( $match[1] );
+				$attrs = $match[2];
+				$text  = wp_strip_all_tags( $match[3] );
+				
+				// Ensure it has an ID, if not, generate one and inject it into content.
+				if ( preg_match( '/id=[\'"]([^\'"]+)[\'"]/i', $attrs, $id_match ) ) {
+					$id = $id_match[1];
+				} else {
+					$id = sanitize_title( $text );
+					if ( empty( $id ) ) $id = 'heading-' . wp_rand( 1000, 9999 );
+					
+					// Replace tag in content with injected ID.
+					$new_tag = "<{$tag} id=\"{$id}\"{$attrs}>{$match[3]}</{$tag}>";
+					// Only replace first occurrence.
+					$pos = strpos( $content, $match[0] );
+					if ( $pos !== false ) {
+						$content = substr_replace( $content, $new_tag, $pos, strlen( $match[0] ) );
+					}
+				}
+
+				$items[] = array(
+					'level' => ( 'h2' === $tag ) ? 2 : 3,
+					'id'    => $id,
+					'text'  => $text,
+				);
+			}
+		}
+
+		return array(
+			'has_toc' => count( $items ) >= 2, // minimum 2 items to show TOC
+			'content' => $content,
+			'items'   => $items,
+		);
+	}
+
+	/**
+	 * Render the TOC HTML box.
+	 */
+	private function build_toc_html( $items ) {
+		if ( empty( $items ) ) return '';
+
+		$html = '<div class="meowpack-toc" style="background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:20px; margin:24px 0;">';
+		$html .= '<h3 style="margin-top:0; margin-bottom:16px; font-size:1.1em;">📑 ' . esc_html__( 'Daftar Isi', 'meowpack' ) . '</h3>';
+		$html .= '<ul style="list-style:none; padding-left:0; margin-bottom:0;">';
+		
+		foreach ( $items as $item ) {
+			$padding = ( $item['level'] === 3 ) ? 'padding-left:20px;' : 'font-weight:600;';
+			$html .= '<li style="margin-bottom:8px; ' . $padding . '">';
+			$html .= '<a href="#' . esc_attr( $item['id'] ) . '" style="text-decoration:none;">' . esc_html( $item['text'] ) . '</a>';
+			$html .= '</li>';
+		}
+		
+		$html .= '</ul></div>';
+		return $html;
+	}
+
+	/**
+	 * Build Related Posts HTML block.
+	 */
+	private function build_related_posts_html( $post_id ) {
+		$categories = get_the_category( $post_id );
+		if ( empty( $categories ) ) {
+			return '';
+		}
+
+		$cat_ids = array_map( function( $cat ) { return $cat->term_id; }, $categories );
+
+		$args = array(
+			'category__in'   => $cat_ids,
+			'post__not_in'   => array( $post_id ),
+			'posts_per_page' => 3,
+			'ignore_sticky_posts' => 1,
+			'no_found_rows'  => true,
+		);
+
+		$query = new WP_Query( $args );
+
+		if ( ! $query->have_posts() ) {
+			return '';
+		}
+
+		$html = '<div class="meowpack-related-posts" style="margin-top:40px; padding-top:20px; border-top:2px solid #f1f3f5;">';
+		$html .= '<h3 style="margin-bottom:20px;">🔗 ' . esc_html__( 'Tulisan Terkait', 'meowpack' ) . '</h3>';
+		$html .= '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">';
+
+		while ( $query->have_posts() ) {
+			$query->the_post();
+			
+			$thumb = has_post_thumbnail() ? get_the_post_thumbnail_url( get_the_ID(), 'medium' ) : '';
+			$bg = $thumb ? "background-image:url('$thumb');" : "background:#e9ecef;";
+
+			$html .= '<a href="' . get_permalink() . '" style="display:block; text-decoration:none; color:inherit; border-radius:8px; overflow:hidden; box-shadow:0 4px 6px rgba(0,0,0,0.05); transition:transform 0.2s;">';
+			$html .= '<div style="height:120px; background-size:cover; background-position:center; ' . $bg . '"></div>';
+			$html .= '<div style="padding:12px 16px;">';
+			$html .= '<h4 style="margin:0; font-size:1em; line-height:1.4;">' . get_the_title() . '</h4>';
+			$html .= '<div style="font-size:0.8em; color:#6c757d; margin-top:8px;">' . get_the_date() . '</div>';
+			$html .= '</div>';
+			$html .= '</a>';
+		}
+
+		$html .= '</div></div>';
+		wp_reset_postdata();
+
+		return $html;
+	}
+
+	/**
+	 * Shortcode callback for [meow_toc]
+	 */
+	public function shortcode_toc() {
+		// Only output if manual is selected, otherwise auto already handled it.
+		// For simplicity, if shortcode is used, just fetch content and generate.
+		// Note: running the filter twice inside shortcode is slow, so we rely on the global post content.
+		$post = get_post();
+		if ( ! $post ) return '';
+
+		$toc_data = $this->generate_toc( $post->post_content );
+		if ( $toc_data['has_toc'] ) {
+			return $this->build_toc_html( $toc_data['items'] );
+		}
+		return '';
+	}
+}

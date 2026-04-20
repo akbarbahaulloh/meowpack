@@ -214,3 +214,160 @@ class MeowPack_Stats_Widget extends WP_Widget {
 		return $this->render_counters( $types );
 	}
 }
+
+/**
+ * MeowPack Popular Posts Widget.
+ */
+class MeowPack_Popular_Widget extends WP_Widget {
+
+	public function __construct() {
+		parent::__construct(
+			'meowpack_popular_widget',
+			__( '🐱 MeowPack: Trending Posts', 'meowpack' ),
+			array( 'description' => __( 'Tampilkan artikel paling banyak dibaca 7 hari terakhir.', 'meowpack' ) )
+		);
+	}
+
+	public function widget( $args, $instance ) {
+		$title = ! empty( $instance['title'] ) ? $instance['title'] : __( 'Terpopuler Minggu Ini', 'meowpack' );
+		$count = ! empty( $instance['count'] ) ? absint( $instance['count'] ) : 5;
+
+		echo wp_kses_post( $args['before_widget'] );
+		if ( $title ) {
+			echo wp_kses_post( $args['before_title'] . esc_html( $title ) . $args['after_title'] );
+		}
+
+		// Fetch popular posts using MeowPack's tracking data
+		global $wpdb;
+		$results = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT post_id, SUM(views) as total_views 
+			 FROM {$wpdb->prefix}meow_daily_stats 
+			 WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
+			 GROUP BY post_id 
+			 ORDER BY total_views DESC 
+			 LIMIT %d",
+			$count
+		) );
+
+		if ( ! empty( $results ) ) {
+			echo '<ul class="meowpack-widget-list" style="list-style:none; padding:0; margin:0;">';
+			foreach ( $results as $row ) {
+				$post = get_post( $row->post_id );
+				if ( ! $post || $post->post_status !== 'publish' ) {
+					continue;
+				}
+				echo '<li style="margin-bottom:12px; display:flex; align-items:center;">';
+				
+				$thumb = get_the_post_thumbnail_url( $post->ID, 'thumbnail' );
+				if ( $thumb ) {
+					echo '<div style="width:50px; height:50px; border-radius:4px; margin-right:12px; background:url(\'' . esc_url( $thumb ) . '\') center/cover;"></div>';
+				} else {
+					echo '<div style="width:50px; height:50px; border-radius:4px; margin-right:12px; background:#e9ecef;"></div>';
+				}
+
+				echo '<div style="flex:1;">';
+				echo '<a href="' . esc_url( get_permalink( $post->ID ) ) . '" style="font-weight:600; text-decoration:none; display:block; line-height:1.3; margin-bottom:4px; color:#cdd6f4;">' . esc_html( $post->post_title ) . '</a>';
+				echo '<div style="font-size:0.8em; color:#a6adc8;">👀 ' . number_format_i18n( $row->total_views ) . ' ' . esc_html__( 'Views', 'meowpack' ) . '</div>';
+				echo '</div>';
+				echo '</li>';
+			}
+			echo '</ul>';
+		} else {
+			echo '<p>' . esc_html__( 'Belum ada data tampilan yang cukup.', 'meowpack' ) . '</p>';
+		}
+
+		echo wp_kses_post( $args['after_widget'] );
+	}
+
+	public function form( $instance ) {
+		$title = ! empty( $instance['title'] ) ? $instance['title'] : __( 'Terpopuler Minggu Ini', 'meowpack' );
+		$count = ! empty( $instance['count'] ) ? $instance['count'] : 5;
+		?>
+		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php esc_html_e( 'Judul:', 'meowpack' ); ?></label>
+			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" type="text" value="<?php echo esc_attr( $title ); ?>">
+		</p>
+		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'count' ) ); ?>"><?php esc_html_e( 'Jumlah ditampilkan:', 'meowpack' ); ?></label>
+			<input class="tiny-text" id="<?php echo esc_attr( $this->get_field_id( 'count' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'count' ) ); ?>" type="number" step="1" min="1" max="20" value="<?php echo esc_attr( $count ); ?>" size="3">
+		</p>
+		<?php
+	}
+
+	public function update( $new_instance, $old_instance ) {
+		$instance = array();
+		$instance['title'] = ( ! empty( $new_instance['title'] ) ) ? sanitize_text_field( $new_instance['title'] ) : '';
+		$instance['count'] = ( ! empty( $new_instance['count'] ) ) ? absint( $new_instance['count'] ) : 5;
+		return $instance;
+	}
+}
+
+/**
+ * MeowPack Random Posts Widget.
+ */
+class MeowPack_Random_Widget extends WP_Widget {
+
+	public function __construct() {
+		parent::__construct(
+			'meowpack_random_widget',
+			__( '🐱 MeowPack: Random Posts', 'meowpack' ),
+			array( 'description' => __( 'Tampilkan artikel secara acak untuk meningkatkan dwell time.', 'meowpack' ) )
+		);
+	}
+
+	public function widget( $args, $instance ) {
+		$title = ! empty( $instance['title'] ) ? $instance['title'] : __( 'Mungkin Anda Suka', 'meowpack' );
+		$count = ! empty( $instance['count'] ) ? absint( $instance['count'] ) : 5;
+
+		echo wp_kses_post( $args['before_widget'] );
+		if ( $title ) {
+			echo wp_kses_post( $args['before_title'] . esc_html( $title ) . $args['after_title'] );
+		}
+
+		$q_args = array(
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'orderby'        => 'rand',
+			'posts_per_page' => $count,
+			'ignore_sticky_posts' => 1,
+		);
+
+		$query = new WP_Query( $q_args );
+
+		if ( $query->have_posts() ) {
+			echo '<ul class="meowpack-widget-list" style="list-style:none; padding:0; margin:0;">';
+			while ( $query->have_posts() ) {
+				$query->the_post();
+				echo '<li style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed rgba(255,255,255,0.1);">';
+				echo '👉 <a href="' . esc_url( get_permalink() ) . '" style="text-decoration:none; color:#cdd6f4;">' . get_the_title() . '</a>';
+				echo '</li>';
+			}
+			echo '</ul>';
+			wp_reset_postdata();
+		}
+
+		echo wp_kses_post( $args['after_widget'] );
+	}
+
+	public function form( $instance ) {
+		$title = ! empty( $instance['title'] ) ? $instance['title'] : __( 'Mungkin Anda Suka', 'meowpack' );
+		$count = ! empty( $instance['count'] ) ? $instance['count'] : 5;
+		?>
+		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php esc_html_e( 'Judul:', 'meowpack' ); ?></label>
+			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" type="text" value="<?php echo esc_attr( $title ); ?>">
+		</p>
+		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'count' ) ); ?>"><?php esc_html_e( 'Jumlah ditampilkan:', 'meowpack' ); ?></label>
+			<input class="tiny-text" id="<?php echo esc_attr( $this->get_field_id( 'count' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'count' ) ); ?>" type="number" step="1" min="1" max="20" value="<?php echo esc_attr( $count ); ?>" size="3">
+		</p>
+		<?php
+	}
+
+	public function update( $new_instance, $old_instance ) {
+		$instance = array();
+		$instance['title'] = ( ! empty( $new_instance['title'] ) ) ? sanitize_text_field( $new_instance['title'] ) : '';
+		$instance['count'] = ( ! empty( $new_instance['count'] ) ) ? absint( $new_instance['count'] ) : 5;
+		return $instance;
+	}
+}

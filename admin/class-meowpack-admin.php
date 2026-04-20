@@ -26,6 +26,19 @@ class MeowPack_Admin {
 		add_action( 'admin_init', array( $this, 'handle_settings_save' ) );
 		add_action( 'admin_init', array( $this, 'handle_token_save' ) );
 		add_action( 'admin_init', array( $this, 'handle_csv_export' ) );
+		// v2.0.0 new form handlers (admin-post.php).
+		add_action( 'admin_post_meowpack_save_hotlink',    array( $this, 'handle_hotlink_save' ) );
+		add_action( 'admin_post_meowpack_save_captcha',    array( $this, 'handle_captcha_save' ) );
+		add_action( 'admin_post_meowpack_save_bot_rules',  array( $this, 'handle_bot_rules_save' ) );
+		add_action( 'admin_post_meowpack_add_bot_rule',    array( $this, 'handle_add_bot_rule' ) );
+		// Content moderation handlers.
+		add_action( 'admin_post_meowpack_save_content_settings',  array( $this, 'handle_content_settings_save' ) );
+		add_action( 'admin_post_meowpack_save_content_rules',     array( $this, 'handle_content_rules_save' ) );
+		add_action( 'admin_post_meowpack_add_content_rule',       array( $this, 'handle_add_content_rule' ) );
+		add_action( 'admin_post_meowpack_bulk_add_content',       array( $this, 'handle_bulk_add_content' ) );
+		add_action( 'admin_post_meowpack_import_content_rules',   array( $this, 'handle_import_content_rules' ) );
+		add_action( 'admin_post_meowpack_export_content_rules',   array( $this, 'handle_export_content_rules' ) );
+		add_action( 'admin_post_meowpack_reset_content_category', array( $this, 'handle_reset_content_category' ) );
 	}
 
 	/**
@@ -42,10 +55,19 @@ class MeowPack_Admin {
 			25
 		);
 
-		add_submenu_page( 'meowpack', __( 'Dashboard', 'meowpack' ),       __( 'Dashboard', 'meowpack' ),       'manage_options', 'meowpack',              array( $this, 'page_dashboard' ) );
-		add_submenu_page( 'meowpack', __( 'Pengaturan', 'meowpack' ),      __( 'Pengaturan', 'meowpack' ),      'manage_options', 'meowpack-settings',     array( $this, 'page_settings' ) );
-		add_submenu_page( 'meowpack', __( 'Auto Share', 'meowpack' ),      __( 'Auto Share', 'meowpack' ),      'manage_options', 'meowpack-autoshare',    array( $this, 'page_autoshare' ) );
-		add_submenu_page( 'meowpack', __( 'Import Jetpack', 'meowpack' ),  __( 'Import Jetpack', 'meowpack' ),  'manage_options', 'meowpack-importer',     array( $this, 'page_importer' ) );
+		add_submenu_page( 'meowpack', __( 'Dashboard', 'meowpack' ),           __( 'Dashboard', 'meowpack' ),           'manage_options', 'meowpack',                     array( $this, 'page_dashboard' ) );
+		add_submenu_page( 'meowpack', __( 'Pengaturan', 'meowpack' ),          __( 'Pengaturan', 'meowpack' ),          'manage_options', 'meowpack-settings',            array( $this, 'page_settings' ) );
+		add_submenu_page( 'meowpack', __( 'Auto Share', 'meowpack' ),          __( 'Auto Share', 'meowpack' ),          'manage_options', 'meowpack-autoshare',           array( $this, 'page_autoshare' ) );
+		// v2.0.0 new pages.
+		add_submenu_page( 'meowpack', __( '📱 Device & Browser', 'meowpack' ), __( '📱 Device & Browser', 'meowpack' ), 'manage_options', 'meowpack-device-stats',         array( $this, 'page_device_stats' ) );
+		add_submenu_page( 'meowpack', __( '🌏 Lokasi', 'meowpack' ),           __( '🌏 Lokasi', 'meowpack' ),           'manage_options', 'meowpack-location-stats',      array( $this, 'page_location_stats' ) );
+		add_submenu_page( 'meowpack', __( '✍️ Per Penulis', 'meowpack' ),      __( '✍️ Per Penulis', 'meowpack' ),      'manage_options', 'meowpack-author-stats',        array( $this, 'page_author_stats' ) );
+		add_submenu_page( 'meowpack', __( '🔗 URL Keluar', 'meowpack' ),       __( '🔗 URL Keluar', 'meowpack' ),       'manage_options', 'meowpack-click-tracker',      array( $this, 'page_click_tracker' ) );
+		add_submenu_page( 'meowpack', __( '🤖 AI Bot Manager', 'meowpack' ),   __( '🤖 AI Bot Manager', 'meowpack' ),   'manage_options', 'meowpack-bot-manager',        array( $this, 'page_bot_manager' ) );
+		add_submenu_page( 'meowpack', __( '🛡️ Anti-Hotlink', 'meowpack' ),          __( '🛡️ Anti-Hotlink', 'meowpack' ),          'manage_options', 'meowpack-hotlink',               array( $this, 'page_hotlink' ) );
+		add_submenu_page( 'meowpack', __( '🔐 Captcha', 'meowpack' ),               __( '🔐 Captcha', 'meowpack' ),               'manage_options', 'meowpack-captcha',              array( $this, 'page_captcha' ) );
+		add_submenu_page( 'meowpack', __( '🚫 Filter Konten', 'meowpack' ),         __( '🚫 Filter Konten', 'meowpack' ),         'manage_options', 'meowpack-content-moderation',  array( $this, 'page_content_moderation' ) );
+		add_submenu_page( 'meowpack', __( 'Import Jetpack', 'meowpack' ),           __( 'Import Jetpack', 'meowpack' ),           'manage_options', 'meowpack-importer',             array( $this, 'page_importer' ) );
 	}
 
 	/**
@@ -59,6 +81,15 @@ class MeowPack_Admin {
 			'meowpack_page_meowpack-settings',
 			'meowpack_page_meowpack-autoshare',
 			'meowpack_page_meowpack-importer',
+			// v2.0.0 new pages.
+			'meowpack_page_meowpack-device-stats',
+			'meowpack_page_meowpack-location-stats',
+			'meowpack_page_meowpack-author-stats',
+			'meowpack_page_meowpack-click-tracker',
+			'meowpack_page_meowpack-bot-manager',
+			'meowpack_page_meowpack-hotlink',
+			'meowpack_page_meowpack-captcha',
+			'meowpack_page_meowpack-content-moderation',  // v2.1.0
 		);
 
 		if ( ! in_array( $hook, $meowpack_pages, true ) ) {
@@ -133,6 +164,10 @@ class MeowPack_Admin {
 			'share_platforms'       => 'sanitize_text_field',
 			'autoshare_platforms'   => 'sanitize_text_field',
 			'autoshare_delay_hours' => 'absint',
+			// Frontend
+			'show_post_meta_bar'    => 'sanitize_text_field',
+			'show_toc'              => 'sanitize_text_field',
+			'enable_related_posts'  => 'absint',
 		);
 
 		foreach ( $fields as $key => $sanitizer ) {
@@ -465,6 +500,324 @@ class MeowPack_Admin {
 	 */
 	public function page_importer() {
 		require_once MEOWPACK_DIR . 'admin/views/page-importer.php';
+	}
+
+	// -------------------------------------------------------------------------
+	// v2.0.0 New Page Renderers
+	// -------------------------------------------------------------------------
+
+	/** Device & Browser stats page. */
+	public function page_device_stats() {
+		require_once MEOWPACK_DIR . 'admin/views/page-device-stats.php';
+	}
+
+	/** Location stats page. */
+	public function page_location_stats() {
+		require_once MEOWPACK_DIR . 'admin/views/page-location-stats.php';
+	}
+
+	/** Author stats page. */
+	public function page_author_stats() {
+		require_once MEOWPACK_DIR . 'admin/views/page-author-stats.php';
+	}
+
+	/** Outbound click tracker page. */
+	public function page_click_tracker() {
+		require_once MEOWPACK_DIR . 'admin/views/page-click-tracker.php';
+	}
+
+	/** AI Bot Manager page. */
+	public function page_bot_manager() {
+		require_once MEOWPACK_DIR . 'admin/views/page-bot-manager.php';
+	}
+
+	/** Anti-Hotlink settings page. */
+	public function page_hotlink() {
+		require_once MEOWPACK_DIR . 'admin/views/page-hotlink.php';
+	}
+
+	/** Captcha settings page. */
+	public function page_captcha() {
+		require_once MEOWPACK_DIR . 'admin/views/settings-captcha.php';
+	}
+
+	// -------------------------------------------------------------------------
+	// v2.0.0 New Form Save Handlers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Handle anti-hotlink settings form (admin-post.php action).
+	 */
+	public function handle_hotlink_save() {
+		check_admin_referer( 'meowpack_save_hotlink', 'meowpack_hotlink_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$fields = array(
+			'enable_anti_hotlink'   => 'absint',
+			'hotlink_extensions'    => 'sanitize_text_field',
+			'hotlink_response'      => 'sanitize_key',
+			'hotlink_redirect_url'  => 'esc_url_raw',
+			'hotlink_whitelist'     => 'sanitize_textarea_field',
+		);
+
+		foreach ( $fields as $key => $sanitizer ) {
+			if ( isset( $_POST[ $key ] ) ) {
+				MeowPack_Database::update_setting( $key, call_user_func( $sanitizer, wp_unslash( $_POST[ $key ] ) ) );
+			} elseif ( 'absint' === $sanitizer ) {
+				MeowPack_Database::update_setting( $key, '0' );
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-hotlink', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Handle captcha settings form (admin-post.php action).
+	 */
+	public function handle_captcha_save() {
+		check_admin_referer( 'meowpack_save_captcha', 'meowpack_captcha_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$checkbox_fields = array(
+			'enable_captcha', 'captcha_on_comments', 'captcha_on_login',
+			'captcha_on_register', 'captcha_on_lostpassword', 'captcha_on_woo_checkout',
+		);
+		foreach ( $checkbox_fields as $key ) {
+			MeowPack_Database::update_setting( $key, isset( $_POST[ $key ] ) ? '1' : '0' );
+		}
+
+		if ( isset( $_POST['captcha_type'] ) ) {
+			MeowPack_Database::update_setting( 'captcha_type', sanitize_key( wp_unslash( $_POST['captcha_type'] ) ) );
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-captcha', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Handle bulk bot rule save (admin-post.php action).
+	 */
+	public function handle_bot_rules_save() {
+		check_admin_referer( 'meowpack_save_bot_rules', 'meowpack_bot_rules_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		// Delete marked rules.
+		if ( ! empty( $_POST['bot_delete'] ) && is_array( $_POST['bot_delete'] ) ) {
+			foreach ( array_map( 'absint', $_POST['bot_delete'] ) as $rule_id ) {
+				MeowPack_AI_Bot_Manager::delete_rule( $rule_id );
+			}
+		}
+
+		// Update actions.
+		if ( ! empty( $_POST['bot_action'] ) && is_array( $_POST['bot_action'] ) ) {
+			foreach ( $_POST['bot_action'] as $rule_id => $action ) {
+				$is_active = isset( $_POST['bot_active'][ $rule_id ] ) ? 1 : 0;
+				MeowPack_AI_Bot_Manager::save_rule(
+					absint( $rule_id ),
+					sanitize_key( $action ),
+					'',
+					$is_active
+				);
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-bot-manager', 'tab' => 'rules', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Handle adding a custom bot rule (admin-post.php action).
+	 */
+	public function handle_add_bot_rule() {
+		check_admin_referer( 'meowpack_add_bot_rule', 'meowpack_add_bot_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$bot_name   = sanitize_text_field( wp_unslash( $_POST['bot_name'] ?? '' ) );
+		$ua_pattern = sanitize_text_field( wp_unslash( $_POST['ua_pattern'] ?? '' ) );
+		$bot_type   = sanitize_key( $_POST['bot_type'] ?? 'ai_bot' );
+		$bot_action = sanitize_key( $_POST['bot_action'] ?? 'allow' );
+
+		if ( $bot_name && $ua_pattern ) {
+			MeowPack_AI_Bot_Manager::add_rule( $bot_name, $ua_pattern, $bot_type, $bot_action );
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-bot-manager', 'tab' => 'rules', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	// -------------------------------------------------------------------------
+	// v2.1.0 Content Moderation Form Handlers
+	// -------------------------------------------------------------------------
+
+	/** Content moderation page. */
+	public function page_content_moderation() {
+		require_once MEOWPACK_DIR . 'admin/views/page-content-moderation.php';
+	}
+
+	/** Save global moderation settings. */
+	public function handle_content_settings_save() {
+		check_admin_referer( 'meowpack_save_content_settings', 'meowpack_content_settings_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$checkboxes = array(
+			'enable_content_moderation',
+			'modscan_comments',
+			'modscan_usernames',
+			'modscan_posts',
+			'moderation_notify_admin',
+		);
+
+		foreach ( $checkboxes as $key ) {
+			MeowPack_Database::update_setting( $key, isset( $_POST[ $key ] ) ? '1' : '0' );
+		}
+
+		// Re-init the moderation instance immediately so rules can catch up if just enabled.
+		if ( isset( $_POST['enable_content_moderation'] ) && class_exists( 'MeowPack_Core' ) ) {
+			$core = MeowPack_Core::get_instance();
+			if ( ! $core->content_moderation ) {
+				$core->content_moderation = new MeowPack_Content_Moderation();
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'settings', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/** Bulk save dictionary rules. */
+	public function handle_content_rules_save() {
+		check_admin_referer( 'meowpack_save_content_rules', 'meowpack_content_rules_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$cat_filter = isset( $_POST['category_filter'] ) ? sanitize_key( wp_unslash( $_POST['category_filter'] ) ) : '';
+
+		// Delete
+		if ( ! empty( $_POST['delete'] ) && is_array( $_POST['delete'] ) ) {
+			foreach ( array_map( 'absint', $_POST['delete'] ) as $id ) {
+				MeowPack_Content_Moderation::delete_rule( $id );
+			}
+		}
+
+		// Update
+		if ( ! empty( $_POST['action'] ) && is_array( $_POST['action'] ) ) {
+			foreach ( $_POST['action'] as $id => $action ) {
+				$mode   = isset( $_POST['match_mode'][ $id ] ) ? sanitize_key( $_POST['match_mode'][ $id ] ) : 'substring';
+				$active = isset( $_POST['active'][ $id ] ) ? 1 : 0;
+				MeowPack_Content_Moderation::update_rule( absint( $id ), $action, $mode, $active );
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'dictionary', 'category' => $cat_filter, 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/** Add single keyword. */
+	public function handle_add_content_rule() {
+		check_admin_referer( 'meowpack_add_content_rule', 'meowpack_add_content_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$keyword    = sanitize_text_field( wp_unslash( $_POST['keyword'] ?? '' ) );
+		$category   = sanitize_key( $_POST['category'] ?? 'custom' );
+		$action     = sanitize_key( $_POST['action'] ?? 'hold' );
+		$match_mode = sanitize_key( $_POST['match_mode'] ?? 'substring' );
+
+		if ( $keyword ) {
+			MeowPack_Content_Moderation::add_rule( $keyword, $category, $action, $match_mode );
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'add', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/** Bulk add keywords via textarea. */
+	public function handle_bulk_add_content() {
+		check_admin_referer( 'meowpack_bulk_add_content', 'meowpack_bulk_content_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$category = sanitize_key( $_POST['category'] ?? 'custom' );
+		$action   = sanitize_key( $_POST['action'] ?? 'hold' );
+		$keywords = preg_split( '/\r?\n/', wp_unslash( $_POST['keywords'] ?? '' ) );
+
+		foreach ( $keywords as $kw ) {
+			$kw = trim( sanitize_text_field( $kw ) );
+			if ( $kw ) {
+				MeowPack_Content_Moderation::add_rule( $kw, $category, $action, 'substring' ); // Default substring for bulk
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'dictionary', 'category' => $category, 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/** Import CSV. */
+	public function handle_import_content_rules() {
+		check_admin_referer( 'meowpack_import_content', 'meowpack_import_content_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$csv_raw = isset( $_POST['csv_content'] ) ? wp_unslash( $_POST['csv_content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		
+		if ( $csv_raw ) {
+			MeowPack_Content_Moderation::import_csv( $csv_raw );
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'import', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/** Export CSV. */
+	public function handle_export_content_rules() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_GET['_wpnonce'] ) ), 'meowpack_export_content' ) ) {
+			wp_die( esc_html__( 'Tautan kadaluarsa.', 'meowpack' ) );
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$csv = MeowPack_Content_Moderation::export_csv();
+
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename=meowpack-content-rules-' . gmdate( 'Ymd' ) . '.csv' );
+		header( 'Pragma: no-cache' );
+		header( 'Expires: 0' );
+
+		// Output BOM for Excel UTF-8 compatibility
+		echo "\xEF\xBB\xBF"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo $csv; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
+
+	/** Reset/flush a whole category. */
+	public function handle_reset_content_category() {
+		check_admin_referer( 'meowpack_reset_content_category', 'meowpack_reset_category_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$category = sanitize_key( $_POST['category'] ?? '' );
+		if ( $category ) {
+			MeowPack_Content_Moderation::delete_rules_by_category( $category );
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'import', 'saved' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
 	}
 }
 

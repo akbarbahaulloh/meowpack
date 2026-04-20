@@ -46,6 +46,42 @@ $s = function( $key, $default = '' ) {
 					<td><label><input type="checkbox" name="enable_autoshare" value="1" <?php checked( '1', $s( 'enable_autoshare', '0' ) ); ?>> <?php esc_html_e( 'Share otomatis saat post dipublish', 'meowpack' ); ?></label></td>
 				</tr>
 			</table>
+			</table>
+		</div>
+
+		<!-- Frontend Enhancements -->
+		<div class="meowpack-settings-section">
+			<h2><?php esc_html_e( 'Tampilan Frontend', 'meowpack' ); ?></h2>
+			<table class="form-table meowpack-form-table">
+				<tr>
+					<th><?php esc_html_e( 'Info Artikel (Views & Estimasi Baca)', 'meowpack' ); ?></th>
+					<td>
+						<select name="show_post_meta_bar">
+							<option value="top" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'top' ); ?>><?php esc_html_e( 'Otomatis di Atas Artikel', 'meowpack' ); ?></option>
+							<option value="bottom" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'bottom' ); ?>><?php esc_html_e( 'Otomatis di Bawah Artikel', 'meowpack' ); ?></option>
+							<option value="hidden" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'hidden' ); ?>><?php esc_html_e( 'Sembunyikan', 'meowpack' ); ?></option>
+						</select>
+						<p class="description"><?php esc_html_e( 'Menampilkan: "📈 1.250 Dilihat • ⏱️ Estimasi Baca: 3 Menit".', 'meowpack' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Table of Contents (Daftar Isi)', 'meowpack' ); ?></th>
+					<td>
+						<select name="show_toc">
+							<option value="auto" <?php selected( $s( 'show_toc', 'auto' ), 'auto' ); ?>><?php esc_html_e( 'Otomatis sebelum Heading (H2) pertama', 'meowpack' ); ?></option>
+							<option value="manual" <?php selected( $s( 'show_toc', 'auto' ), 'manual' ); ?>><?php esc_html_e( 'Manual via Shortcode [meow_toc]', 'meowpack' ); ?></option>
+							<option value="hidden" <?php selected( $s( 'show_toc', 'auto' ), 'hidden' ); ?>><?php esc_html_e( 'Sembunyikan', 'meowpack' ); ?></option>
+						</select>
+						<p class="description"><?php esc_html_e( 'Akan di-generate otomatis dari struktur heading artikel Anda.', 'meowpack' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Related Posts', 'meowpack' ); ?></th>
+					<td>
+						<label><input type="checkbox" name="enable_related_posts" value="1" <?php checked( '1', $s( 'enable_related_posts', '1' ) ); ?>> <?php esc_html_e( 'Otomatis tampilkan 3 artikel terkait di akhir paragraf', 'meowpack' ); ?></label>
+					</td>
+				</tr>
+			</table>
 		</div>
 
 		<!-- Tracking Settings -->

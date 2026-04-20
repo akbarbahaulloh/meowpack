@@ -38,6 +38,27 @@ class MeowPack_Core {
 	/** @var MeowPack_Importer */
 	public $importer;
 
+	/** @var MeowPack_AI_Bot_Manager */
+	public $ai_bot_manager;
+
+	/** @var MeowPack_Click_Tracker */
+	public $click_tracker;
+
+	/** @var MeowPack_Reading_Time */
+	public $reading_time;
+
+	/** @var MeowPack_Anti_Hotlink */
+	public $anti_hotlink;
+
+	/** @var MeowPack_Captcha */
+	public $captcha;
+
+	/** @var MeowPack_Content_Moderation */
+	public $content_moderation;
+
+	/** @var MeowPack_Frontend_Enhancer */
+	public $frontend;
+
 	/**
 	 * Get singleton instance.
 	 *
@@ -57,13 +78,32 @@ class MeowPack_Core {
 		// Ensure DB is up-to-date on every load (lightweight version check).
 		MeowPack_Database::install();
 
+		// -----------------------------------------------------------------------
 		// Init sub-systems.
+		// -----------------------------------------------------------------------
+
+		// AI Bot Manager runs at init priority 1 — before everything else.
+		$this->ai_bot_manager = new MeowPack_AI_Bot_Manager();
+
 		$this->tracker       = new MeowPack_Tracker();
 		$this->stats         = new MeowPack_Stats();
 		$this->autoshare     = new MeowPack_AutoShare();
 		$this->share_buttons = new MeowPack_ShareButtons();
 		$this->view_counter  = new MeowPack_ViewCounter();
 		$this->importer      = new MeowPack_Importer();
+		$this->click_tracker = new MeowPack_Click_Tracker();
+		$this->reading_time  = new MeowPack_Reading_Time();
+		$this->anti_hotlink  = new MeowPack_Anti_Hotlink();
+		$this->captcha       = new MeowPack_Captcha();
+		$this->content_moderation = new MeowPack_Content_Moderation();
+		
+		if ( class_exists( 'MeowPack_Frontend_Enhancer' ) ) {
+			$this->frontend = new MeowPack_Frontend_Enhancer();
+		}
+
+		if ( class_exists( 'MeowPack_GitHub_Updater' ) ) {
+			new MeowPack_GitHub_Updater();
+		}
 
 		// Register REST API routes.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
@@ -79,7 +119,7 @@ class MeowPack_Core {
 	 * Register REST API routes.
 	 */
 	public function register_rest_routes() {
-		// Tracking endpoint.
+		// --- Tracking endpoint -------------------------------------------------
 		register_rest_route(
 			'meowpack/v1',
 			'/track',
@@ -98,7 +138,41 @@ class MeowPack_Core {
 			)
 		);
 
-		// Stats endpoint (for admin AJAX charts).
+		// --- Engagement (reading time + scroll depth) --------------------------
+		register_rest_route(
+			'meowpack/v1',
+			'/engagement',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this->reading_time, 'handle_engagement_request' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'post_id'      => array( 'type' => 'integer', 'sanitize_callback' => 'absint' ),
+					'time_on_page' => array( 'type' => 'integer', 'sanitize_callback' => 'absint' ),
+					'scroll_depth' => array( 'type' => 'integer', 'sanitize_callback' => 'absint' ),
+					'nonce'        => array( 'type' => 'string',  'sanitize_callback' => 'sanitize_text_field' ),
+				),
+			)
+		);
+
+		// --- Outbound click tracking -------------------------------------------
+		register_rest_route(
+			'meowpack/v1',
+			'/click',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this->click_tracker, 'handle_click_request' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'post_id'     => array( 'type' => 'integer', 'sanitize_callback' => 'absint' ),
+					'url'         => array( 'type' => 'string',  'sanitize_callback' => 'esc_url_raw' ),
+					'anchor_text' => array( 'type' => 'string',  'sanitize_callback' => 'sanitize_text_field' ),
+					'nonce'       => array( 'type' => 'string',  'sanitize_callback' => 'sanitize_text_field' ),
+				),
+			)
+		);
+
+		// --- Stats endpoint (admin dashboard charts) ---------------------------
 		register_rest_route(
 			'meowpack/v1',
 			'/stats',
@@ -111,7 +185,7 @@ class MeowPack_Core {
 			)
 		);
 
-		// Share click counter.
+		// --- Share click counter ----------------------------------------------
 		register_rest_route(
 			'meowpack/v1',
 			'/share-click',
@@ -127,7 +201,7 @@ class MeowPack_Core {
 			)
 		);
 
-		// Importer AJAX via REST.
+		// --- Importer AJAX via REST -------------------------------------------
 		register_rest_route(
 			'meowpack/v1',
 			'/import',
@@ -146,6 +220,7 @@ class MeowPack_Core {
 	 *  1. Aggregate yesterday's visits into daily_stats.
 	 *  2. Delete raw visits older than retention period.
 	 *  3. Retry failed share logs.
+	 *  4. Aggregate bot stats.
 	 */
 	public function run_daily_cron() {
 		$this->stats->aggregate_yesterday();

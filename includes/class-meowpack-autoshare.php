@@ -42,6 +42,12 @@ class MeowPack_AutoShare {
 		// Meta box for per-post platform selection.
 		add_action( 'add_meta_boxes', array( $this, 'register_meta_box' ) );
 		add_action( 'save_post', array( $this, 'save_meta_box' ), 10, 2 );
+
+		// Admin post row actions for manual share.
+		add_filter( 'post_row_actions', array( $this, 'add_row_action' ), 10, 2 );
+		add_filter( 'page_row_actions', array( $this, 'add_row_action' ), 10, 2 );
+		add_action( 'admin_post_meowpack_manual_autoshare', array( $this, 'handle_manual_share' ) );
+		add_action( 'admin_notices', array( $this, 'show_share_notice' ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -174,6 +180,77 @@ class MeowPack_AutoShare {
 
 		$platforms = array_intersect( $platforms, self::$platforms );
 		update_post_meta( $post_id, '_meow_autoshare_platforms', $platforms );
+	}
+
+	// -------------------------------------------------------------------------
+	// Manual Share via Row Actions
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Add "Bagikan ke Sosmed" link to post row actions.
+	 *
+	 * @param array   $actions Row actions.
+	 * @param WP_Post $post    Post object.
+	 * @return array
+	 */
+	public function add_row_action( $actions, $post ) {
+		if ( 'publish' !== $post->post_status ) {
+			return $actions;
+		}
+
+		$url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=meowpack_manual_autoshare&post_id=' . $post->ID ),
+			'meowpack_manual_share_' . $post->ID
+		);
+
+		$actions['meowpack_share'] = sprintf(
+			'<a href="%s" style="color:#0073aa; font-weight:600;">%s</a>',
+			esc_url( $url ),
+			esc_html__( '🚀 Bagikan ke Sosmed', 'meowpack' )
+		);
+
+		return $actions;
+	}
+
+	/**
+	 * Handle manual share execution from row action.
+	 */
+	public function handle_manual_share() {
+		$post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;
+		if ( ! $post_id || ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Permintaan tidak valid.', 'meowpack' ) );
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'meowpack_manual_share_' . $post_id ) ) {
+			wp_die( esc_html__( 'Keamanan (Nonce) gagal diverifikasi.', 'meowpack' ) );
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_die( esc_html__( 'Akses ditolak.', 'meowpack' ) );
+		}
+
+		$selected_platforms = get_post_meta( $post_id, '_meow_autoshare_platforms', true );
+		if ( empty( $selected_platforms ) || ! is_array( $selected_platforms ) ) {
+			$setting_platforms = MeowPack_Database::get_setting( 'autoshare_platforms', 'telegram' );
+			$selected_platforms = array_map( 'trim', explode( ',', $setting_platforms ) );
+		}
+
+		// Force instant share regardless of delay setting.
+		$this->share_post( $post_id, $selected_platforms );
+
+		$redirect = wp_get_referer() ? wp_get_referer() : admin_url( 'edit.php' );
+		wp_safe_redirect( add_query_arg( 'meowpack_shared', $post_id, $redirect ) );
+		exit;
+	}
+
+	/**
+	 * Show success notice after manual share.
+	 */
+	public function show_share_notice() {
+		if ( isset( $_GET['meowpack_shared'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$post_id = absint( $_GET['meowpack_shared'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			echo '<div class="notice notice-success is-dismissible"><p>✅ <strong>Berhasil!</strong> ' . sprintf( esc_html__( 'Artikel ID %d sedang didistribusikan ke sosial media aktif.', 'meowpack' ), $post_id ) . '</p></div>';
+		}
 	}
 
 	// -------------------------------------------------------------------------

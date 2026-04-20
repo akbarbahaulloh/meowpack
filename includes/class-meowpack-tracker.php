@@ -15,6 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Injects the non-blocking JavaScript tracker on the frontend and
  * processes tracking data received via the REST API endpoint.
+ *
+ * v2.0.0: Collects device_type, browser, os, author_id, region, city, bot_name.
  */
 class MeowPack_Tracker {
 
@@ -66,9 +68,14 @@ class MeowPack_Tracker {
 			'meowpack-tracker',
 			'meowpack_data',
 			array(
-				'post_id'  => $post_id,
-				'endpoint' => rest_url( 'meowpack/v1/track' ),
-				'nonce'    => wp_create_nonce( 'meowpack_track' ),
+				'post_id'             => $post_id,
+				'endpoint'            => rest_url( 'meowpack/v1/track' ),
+				'engagement_endpoint' => rest_url( 'meowpack/v1/engagement' ),
+				'click_endpoint'      => rest_url( 'meowpack/v1/click' ),
+				'nonce'               => wp_create_nonce( 'meowpack_track' ),
+				'site_host'           => wp_parse_url( home_url(), PHP_URL_HOST ),
+				'enable_clicks'       => MeowPack_Database::get_setting( 'enable_click_tracker', '1' ),
+				'enable_engagement'   => MeowPack_Database::get_setting( 'enable_reading_time', '1' ),
 			)
 		);
 	}
@@ -80,10 +87,9 @@ class MeowPack_Tracker {
 	 * @return WP_REST_Response
 	 */
 	public function handle_track_request( WP_REST_Request $request ) {
-		// Validate nonce (optional layer — REST is already protected by origin).
+		// Validate nonce.
 		$nonce = $request->get_param( 'nonce' );
 		if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
-			// Soft fail — don't expose nonce errors to bots.
 			return new WP_REST_Response( array( 'ok' => false ), 200 );
 		}
 
@@ -101,12 +107,29 @@ class MeowPack_Tracker {
 		$ip     = MeowPack_Bot_Filter::get_client_ip();
 		$is_bot = MeowPack_Bot_Filter::is_bot( $ua, $ip ) ? 1 : 0;
 
+		// Detect AI bot name for flagged visits.
+		$bot_info = MeowPack_AI_Bot_Manager::detect_from_ua( $ua );
+		$bot_name = $bot_info['bot_name'];
+
+		// Parse traffic source.
 		$source = MeowPack_Bot_Filter::parse_source( $referrer, $utm_source, $utm_medium );
 
+		// Hash IP for privacy.
 		$ip_hash = MeowPack_Bot_Filter::hash_ip( $ip );
+
+		// Detect device / browser / OS.
+		$device_info = MeowPack_Device_Detector::parse( $ua );
+
+		// Geo-location (country + region + city).
+		$geo = $this->get_geo_data( $ip );
+
+		// Author of the post.
+		$post      = get_post( $post_id );
+		$author_id = $post ? (int) $post->post_author : 0;
 
 		$this->record_visit( array(
 			'post_id'      => $post_id,
+			'author_id'    => $author_id,
 			'visit_date'   => current_time( 'Y-m-d' ),
 			'visit_hour'   => (int) current_time( 'G' ),
 			'ip_hash'      => $ip_hash,
@@ -115,8 +138,14 @@ class MeowPack_Tracker {
 			'utm_source'   => $utm_source,
 			'utm_medium'   => $utm_medium,
 			'utm_campaign' => $utm_campaign,
-			'country_code' => $this->get_country_code( $ip ),
+			'country_code' => $geo['country_code'],
+			'region'       => $geo['region'],
+			'city'         => $geo['city'],
+			'device_type'  => $device_info['device'],
+			'browser'      => $device_info['browser'],
+			'os'           => $device_info['os'],
 			'is_bot'       => $is_bot,
+			'bot_name'     => $bot_name,
 		) );
 
 		return new WP_REST_Response( array( 'ok' => true ), 200 );
@@ -135,6 +164,7 @@ class MeowPack_Tracker {
 			$table,
 			array(
 				'post_id'      => $data['post_id'],
+				'author_id'    => $data['author_id'],
 				'visit_date'   => $data['visit_date'],
 				'visit_hour'   => $data['visit_hour'],
 				'ip_hash'      => $data['ip_hash'],
@@ -144,26 +174,36 @@ class MeowPack_Tracker {
 				'utm_medium'   => $data['utm_medium'],
 				'utm_campaign' => $data['utm_campaign'],
 				'country_code' => $data['country_code'],
+				'region'       => $data['region'],
+				'city'         => $data['city'],
+				'device_type'  => $data['device_type'],
+				'browser'      => $data['browser'],
+				'os'           => $data['os'],
 				'is_bot'       => $data['is_bot'],
+				'bot_name'     => $data['bot_name'],
 				'created_at'   => current_time( 'mysql' ),
 			),
-			array( '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
+			array(
+				'%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s',
+				'%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s',
+			)
 		);
 	}
 
 	/**
-	 * Get the 2-letter country code for an IP.
-	 * Uses IP-API (free, no key required) — falls back gracefully.
-	 *
-	 * For production, replace with local MaxMind GeoIP2 Lite database.
+	 * Geo-locate an IP address.
+	 * Uses ip-api.com (free, region + city available).
+	 * For production, swap with local MaxMind GeoLite2-City.mmdb.
 	 *
 	 * @param string $ip IP address.
-	 * @return string 2-letter country code or empty string.
+	 * @return array{ country_code: string, region: string, city: string }
 	 */
-	private function get_country_code( $ip ) {
-		// Skip for private/local IPs.
+	private function get_geo_data( $ip ) {
+		$empty = array( 'country_code' => '', 'region' => '', 'city' => '' );
+
+		// Skip private/local IPs.
 		if ( ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
-			return '';
+			return $empty;
 		}
 
 		$cache_key = 'meowpack_geo_' . md5( $ip );
@@ -173,19 +213,25 @@ class MeowPack_Tracker {
 		}
 
 		$response = wp_remote_get(
-			'http://ip-api.com/json/' . rawurlencode( $ip ) . '?fields=countryCode',
+			'http://ip-api.com/json/' . rawurlencode( $ip ) . '?fields=countryCode,regionName,city',
 			array( 'timeout' => 3, 'sslverify' => false )
 		);
 
-		$country = '';
+		$result = $empty;
 		if ( ! is_wp_error( $response ) ) {
 			$body = json_decode( wp_remote_retrieve_body( $response ), true );
 			if ( ! empty( $body['countryCode'] ) ) {
-				$country = sanitize_text_field( $body['countryCode'] );
+				$result['country_code'] = sanitize_text_field( $body['countryCode'] );
+			}
+			if ( ! empty( $body['regionName'] ) ) {
+				$result['region'] = sanitize_text_field( $body['regionName'] );
+			}
+			if ( ! empty( $body['city'] ) ) {
+				$result['city'] = sanitize_text_field( $body['city'] );
 			}
 		}
 
-		set_transient( $cache_key, $country, DAY_IN_SECONDS );
-		return $country;
+		set_transient( $cache_key, $result, DAY_IN_SECONDS );
+		return $result;
 	}
 }

@@ -80,9 +80,13 @@ add_action( 'plugins_loaded', 'meowpack_load_textdomain' );
  */
 function meowpack_load_files() {
 	$includes = array(
+		// Core infrastructure (load first).
 		'includes/class-meowpack-database.php',
-		'includes/class-meowpack-core.php',
 		'includes/class-meowpack-bot-filter.php',
+		'includes/class-meowpack-device-detector.php',   // v2.0.0
+		'includes/class-meowpack-ai-bot-manager.php',    // v2.0.0
+		// Main systems.
+		'includes/class-meowpack-core.php',
 		'includes/class-meowpack-tracker.php',
 		'includes/class-meowpack-stats.php',
 		'includes/class-meowpack-autoshare.php',
@@ -90,6 +94,16 @@ function meowpack_load_files() {
 		'includes/class-meowpack-view-counter.php',
 		'includes/class-meowpack-widget.php',
 		'includes/class-meowpack-importer.php',
+		// v2.0.0 new modules.
+		'includes/class-meowpack-click-tracker.php',
+		'includes/class-meowpack-reading-time.php',
+		'includes/class-meowpack-anti-hotlink.php',
+		'includes/class-meowpack-captcha.php',
+		'includes/class-meowpack-content-moderation.php',
+		'includes/class-meowpack-frontend-enhancer.php',
+		'includes/class-meowpack-github-updater.php',
+
+		// Admin (last — depends on all the above).
 		'admin/class-meowpack-admin.php',
 	);
 
@@ -117,6 +131,8 @@ function meowpack_init() {
 	// Register widget.
 	add_action( 'widgets_init', function () {
 		register_widget( 'MeowPack_Stats_Widget' );
+		register_widget( 'MeowPack_Popular_Widget' );
+		register_widget( 'MeowPack_Random_Widget' );
 	} );
 }
 add_action( 'plugins_loaded', 'meowpack_init' );
