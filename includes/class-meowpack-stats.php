@@ -717,6 +717,20 @@ class MeowPack_Stats {
 	}
 
 	/**
+	 * Get top regions (provinces/states).
+	 */
+	public function get_region_stats( $period = 'today', $limit = 15 ) {
+		return $this->get_generic_breakdown( $period, 'region', array(), $limit );
+	}
+
+	/**
+	 * Get top cities.
+	 */
+	public function get_city_stats( $period = 'today', $limit = 15 ) {
+		return $this->get_generic_breakdown( $period, 'city', array(), $limit );
+	}
+
+	/**
 	 * Get top authors.
 	 */
 	public function get_author_stats( $period = 'today' ) {
