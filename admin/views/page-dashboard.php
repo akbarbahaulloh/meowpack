@@ -139,7 +139,6 @@ $stats = MeowPack_Core::get_instance()->stats;
 		</p>
 	</div>
 </div>
-</div>
 
 <script>
 // Embed chart data inline to avoid extra REST call on page load.
