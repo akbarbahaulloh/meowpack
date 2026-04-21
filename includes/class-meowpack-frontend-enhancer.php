@@ -52,10 +52,12 @@ class MeowPack_Frontend_Enhancer {
 		$meta_mode = MeowPack_Database::get_setting( 'show_post_meta_bar', 'top' );
 		if ( 'hidden' !== $meta_mode ) {
 			$meta_html = $this->build_post_meta_html( $content, $post_id );
-			if ( 'top' === $meta_mode ) {
-				$content = $meta_html . $content;
-			} else {
-				$content = $content . $meta_html;
+			if ( $meta_html ) {
+				if ( 'top' === $meta_mode ) {
+					$content = $meta_html . $content;
+				} else {
+					$content = $content . $meta_html;
+				}
 			}
 		}
 
@@ -72,21 +74,36 @@ class MeowPack_Frontend_Enhancer {
 	 * Build the Post Meta Bar (Views + Estimated Reading Time).
 	 */
 	private function build_post_meta_html( $content, $post_id ) {
-		// Get real-time views from stats engine
-		$views = MeowPack_Core::get_instance()->stats->get_post_views( $post_id );
+		$post_type = get_post_type( $post_id );
+		
+		$views_allowed = explode( ',', MeowPack_Database::get_setting( 'show_views_on', 'post,page' ) );
+		$read_allowed  = explode( ',', MeowPack_Database::get_setting( 'show_reading_time_on', 'post,page' ) );
 
-		// Calculate WPM
-		$word_count = str_word_count( wp_strip_all_tags( $content ) );
-		$wpm = 200;
-		$minutes = max( 1, ceil( $word_count / $wpm ) );
+		$show_views = in_array( $post_type, $views_allowed, true );
+		$show_read  = in_array( $post_type, $read_allowed, true );
 
-		$views_txt   = number_format_i18n( $views ) . ' ' . esc_html__( 'Dilihat', 'meowpack' );
-		$reading_txt = sprintf( esc_html__( 'Estimasi Baca: %d Menit', 'meowpack' ), $minutes );
+		if ( ! $show_views && ! $show_read ) {
+			return '';
+		}
 
-		return '<div class="meowpack-post-meta" style="display:flex; gap:16px; padding:12px 16px; background:rgba(0,0,0,0.03); border-radius:8px; margin:20px 0; font-size:0.9em; font-weight:500;">
-			<span title="Berdasarkan lalu lintas pengunjung">📈 ' . esc_html( $views_txt ) . '</span>
-			<span title="Berdasarkan 200 kata per menit">⏱️ ' . esc_html( $reading_txt ) . '</span>
-		</div>';
+		$html = '<div class="meowpack-post-meta" style="display:flex; gap:16px; padding:12px 16px; background:rgba(0,0,0,0.03); border-radius:8px; margin:20px 0; font-size:0.9em; font-weight:500;">';
+
+		if ( $show_views ) {
+			$views = MeowPack_Core::get_instance()->stats->get_post_views( $post_id );
+			$views_txt = number_format_i18n( $views ) . ' ' . esc_html__( 'Dilihat', 'meowpack' );
+			$html .= '<span title="Berdasarkan lalu lintas pengunjung">📈 ' . esc_html( $views_txt ) . '</span>';
+		}
+
+		if ( $show_read ) {
+			$word_count = str_word_count( wp_strip_all_tags( $content ) );
+			$wpm = 200;
+			$minutes = max( 1, ceil( $word_count / $wpm ) );
+			$reading_txt = sprintf( esc_html__( 'Estimasi Baca: %d Menit', 'meowpack' ), $minutes );
+			$html .= '<span title="Berdasarkan 200 kata per menit">⏱️ ' . esc_html( $reading_txt ) . '</span>';
+		}
+
+		$html .= '</div>';
+		return $html;
 	}
 
 	/**

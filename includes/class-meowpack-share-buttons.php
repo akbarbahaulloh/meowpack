@@ -70,6 +70,12 @@ class MeowPack_ShareButtons {
 			return $content;
 		}
 
+		$post_type = get_post_type();
+		$allowed   = explode( ',', MeowPack_Database::get_setting( 'show_share_buttons_on', 'post,page' ) );
+		if ( ! in_array( $post_type, $allowed, true ) ) {
+			return $content;
+		}
+
 		$position = MeowPack_Database::get_setting( 'share_button_position', 'after' );
 		$html     = $this->render( get_the_ID() );
 

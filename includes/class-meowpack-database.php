@@ -348,6 +348,9 @@ class MeowPack_Database {
 			'moderation_notify_admin'   => '1',
 			// Frontend Enhancers
 			'show_post_meta_bar'        => 'top',
+			'show_views_on'             => 'post,page',
+			'show_reading_time_on'      => 'post,page',
+			'show_share_buttons_on'     => 'post,page',
 			'show_toc'                  => 'auto',
 			'enable_related_posts'      => '1',
 		);

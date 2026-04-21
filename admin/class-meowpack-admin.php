@@ -173,9 +173,20 @@ class MeowPack_Admin {
 			'autoshare_delay_hours' => 'absint',
 			// Frontend
 			'show_post_meta_bar'    => 'sanitize_text_field',
+			'show_views_on'         => 'array',
+			'show_reading_time_on'  => 'array',
+			'show_share_buttons_on' => 'array',
 			'show_toc'              => 'sanitize_text_field',
 			'enable_related_posts'  => 'absint',
 		);
+
+		// Handle missing array fields (when all checkboxes are unchecked)
+		$array_fields = array( 'track_post_types', 'show_views_on', 'show_reading_time_on', 'show_share_buttons_on' );
+		foreach ( $array_fields as $array_key ) {
+			if ( ! isset( $_POST[ $array_key ] ) ) {
+				MeowPack_Database::update_setting( $array_key, '' );
+			}
+		}
 
 		foreach ( $fields as $key => $sanitizer ) {
 			if ( isset( $_POST[ $key ] ) ) {
@@ -183,7 +194,7 @@ class MeowPack_Admin {
 				if ( is_array( $val_raw ) ) {
 					$value = implode( ',', array_map( 'sanitize_text_field', $val_raw ) );
 				} else {
-					$value = call_user_func( $sanitizer, $val_raw );
+					$value = ( 'array' === $sanitizer ) ? '' : call_user_func( $sanitizer, $val_raw );
 				}
 				MeowPack_Database::update_setting( $key, $value );
 			} elseif ( in_array( $sanitizer, array( 'absint' ), true ) ) {

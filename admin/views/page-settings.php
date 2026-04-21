@@ -55,12 +55,38 @@ $s = function( $key, $default = '' ) {
 				<tr>
 					<th><?php esc_html_e( 'Info Artikel (Views & Estimasi Baca)', 'meowpack' ); ?></th>
 					<td>
-						<select name="show_post_meta_bar">
+						<select name="show_post_meta_bar" style="margin-bottom: 10px;">
 							<option value="top" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'top' ); ?>><?php esc_html_e( 'Otomatis di Atas Artikel', 'meowpack' ); ?></option>
 							<option value="bottom" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'bottom' ); ?>><?php esc_html_e( 'Otomatis di Bawah Artikel', 'meowpack' ); ?></option>
-							<option value="hidden" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'hidden' ); ?>><?php esc_html_e( 'Sembunyikan', 'meowpack' ); ?></option>
+							<option value="hidden" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'hidden' ); ?>><?php esc_html_e( 'Sembunyikan Total', 'meowpack' ); ?></option>
 						</select>
-						<p class="description"><?php esc_html_e( 'Menampilkan: "📈 1.250 Dilihat • ⏱️ Estimasi Baca: 3 Menit".', 'meowpack' ); ?></p>
+						<p class="description" style="margin-bottom: 15px;"><?php esc_html_e( 'Menampilkan: "📈 1.250 Dilihat • ⏱️ Estimasi Baca: 3 Menit".', 'meowpack' ); ?></p>
+						
+						<?php
+						$all_types = array( 'post' => 'Pos', 'page' => 'Halaman', 'attachment' => 'Media' );
+						$views_on  = explode( ',', $s( 'show_views_on', 'post,page' ) );
+						$read_on   = explode( ',', $s( 'show_reading_time_on', 'post,page' ) );
+						?>
+						
+						<div style="margin-bottom:10px; padding:10px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:4px; max-width:400px;">
+							<strong><?php esc_html_e( 'Tampilkan Jumlah Dilihat (Views) di:', 'meowpack' ); ?></strong><br>
+							<?php foreach ( $all_types as $type_slug => $type_label ) : ?>
+								<label style="margin-right: 15px; display: inline-block;">
+									<input type="checkbox" name="show_views_on[]" value="<?php echo esc_attr( $type_slug ); ?>" <?php checked( in_array( $type_slug, $views_on, true ) ); ?>>
+									<?php echo esc_html( $type_label ); ?>
+								</label>
+							<?php endforeach; ?>
+						</div>
+
+						<div style="padding:10px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:4px; max-width:400px;">
+							<strong><?php esc_html_e( 'Tampilkan Menit Dibaca (Reading Time) di:', 'meowpack' ); ?></strong><br>
+							<?php foreach ( $all_types as $type_slug => $type_label ) : ?>
+								<label style="margin-right: 15px; display: inline-block;">
+									<input type="checkbox" name="show_reading_time_on[]" value="<?php echo esc_attr( $type_slug ); ?>" <?php checked( in_array( $type_slug, $read_on, true ) ); ?>>
+									<?php echo esc_html( $type_label ); ?>
+								</label>
+							<?php endforeach; ?>
+						</div>
 					</td>
 				</tr>
 				<tr>
@@ -125,7 +151,7 @@ $s = function( $key, $default = '' ) {
 				<tr>
 					<th><?php esc_html_e( 'Posisi Tombol', 'meowpack' ); ?></th>
 					<td>
-						<select name="share_button_position">
+						<select name="share_button_position" style="margin-bottom: 15px;">
 							<?php
 							$pos_options = array(
 								'after'  => __( 'Setelah konten', 'meowpack' ),
@@ -139,6 +165,20 @@ $s = function( $key, $default = '' ) {
 							<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $current_pos, $val ); ?>><?php echo esc_html( $label ); ?></option>
 							<?php endforeach; ?>
 						</select>
+
+						<?php
+						$all_types = array( 'post' => 'Pos', 'page' => 'Halaman', 'attachment' => 'Media' );
+						$share_on  = explode( ',', $s( 'show_share_buttons_on', 'post,page' ) );
+						?>
+						<div style="padding:10px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:4px; max-width:400px;">
+							<strong><?php esc_html_e( 'Tampilkan Tombol Share di:', 'meowpack' ); ?></strong><br>
+							<?php foreach ( $all_types as $type_slug => $type_label ) : ?>
+								<label style="margin-right: 15px; display: inline-block;">
+									<input type="checkbox" name="show_share_buttons_on[]" value="<?php echo esc_attr( $type_slug ); ?>" <?php checked( in_array( $type_slug, $share_on, true ) ); ?>>
+									<?php echo esc_html( $type_label ); ?>
+								</label>
+							<?php endforeach; ?>
+						</div>
 					</td>
 				</tr>
 				<tr>
