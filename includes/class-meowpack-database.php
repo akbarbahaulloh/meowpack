@@ -320,7 +320,7 @@ class MeowPack_Database {
 			'share_button_position'    => 'after',
 			'share_button_style'       => 'icon-text',
 			'number_format'            => 'id',
-			'data_retention_days'      => '30',
+			'data_retention_days'      => '365',
 			'exclude_admins'           => '1',
 			'track_post_types'         => 'post,page',
 			'share_platforms'          => 'facebook,twitter,telegram,whatsapp',

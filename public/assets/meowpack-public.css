@@ -1,27 +1,94 @@
 /* ==========================================================================
-   MeowPack Public Styles
+   MeowPack Public Styles — Premium Edition
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+
+:root {
+	--mp-primary: #6366f1;
+	--mp-secondary: #06b6d4;
+	--mp-accent: #f43f5e;
+	--mp-bg-glass: rgba(255, 255, 255, 0.7);
+	--mp-border-glass: rgba(255, 255, 255, 0.3);
+	--mp-text-main: #1e293b;
+	--mp-text-muted: #64748b;
+	--mp-font: 'Outfit', 'Inter', -apple-system, sans-serif;
+}
 
 /* =========================================================
-   View Count Badge
+   View Count & Post Meta Bar
    ========================================================= */
-.meowpack-view-count {
+.meowpack-post-meta-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 16px;
+	margin-bottom: 24px;
+	padding: 12px 20px;
+	background: var(--mp-bg-glass);
+	backdrop-filter: blur(8px);
+	border: 1px solid var(--mp-border-glass);
+	border-radius: 12px;
+	box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+	font-family: var(--mp-font);
+}
+
+.meowpack-view-count, .meowpack-reading-time {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
-	font-size: 13px;
-	color: #64748b;
-	margin-bottom: 16px;
-	font-family: 'Inter', sans-serif;
+	gap: 6px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--mp-text-muted);
 }
 .meowpack-view-count svg {
-	width: 15px;
-	height: 15px;
-	flex-shrink: 0;
-	color: #6366f1;
+	width: 16px;
+	height: 16px;
+	color: var(--mp-primary);
 }
+
+/* =========================================================
+   Table of Contents (TOC)
+   ========================================================= */
+.meowpack-toc {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 16px;
+	padding: 24px;
+	margin: 32px 0;
+	font-family: var(--mp-font);
+	max-width: 100%;
+}
+.meowpack-toc__title {
+	font-size: 18px;
+	font-weight: 700;
+	color: var(--mp-text-main);
+	margin: 0 0 16px 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.meowpack-toc__list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.meowpack-toc__item {
+	margin-bottom: 8px;
+	line-height: 1.4;
+}
+.meowpack-toc__link {
+	text-decoration: none;
+	color: var(--mp-text-muted);
+	transition: color 0.2s, padding-left 0.2s;
+	display: inline-block;
+}
+.meowpack-toc__link:hover {
+	color: var(--mp-primary);
+	padding-left: 5px;
+}
+.meowpack-toc__item--h3 { padding-left: 20px; font-size: 0.95em; }
+.meowpack-toc__item--h4 { padding-left: 40px; font-size: 0.9em; }
 
 /* =========================================================
    Share Buttons
@@ -30,156 +97,145 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 8px;
-	margin: 24px 0;
-	font-family: 'Inter', -apple-system, sans-serif;
+	gap: 10px;
+	margin: 32px 0;
+	font-family: var(--mp-font);
 }
 
 .meowpack-share__label {
-	font-size: 13px;
-	font-weight: 600;
-	color: #64748b;
-	margin-right: 2px;
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--mp-text-main);
+	margin-right: 4px;
 }
 
-/* Base button */
 .meowpack-share__btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 7px;
-	padding: 8px 14px;
-	border-radius: 8px;
-	font-size: 13px;
-	font-weight: 500;
+	gap: 8px;
+	padding: 10px 18px;
+	border-radius: 10px;
+	font-size: 14px;
+	font-weight: 600;
 	text-decoration: none;
 	color: #fff;
 	background: var(--btn-color, #888);
-	transition: opacity .2s, transform .15s, box-shadow .2s;
-	line-height: 1;
-	white-space: nowrap;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 .meowpack-share__btn:hover {
-	opacity: .88;
-	transform: translateY(-1px);
-	box-shadow: 0 4px 12px rgba(0,0,0,.15);
+	transform: translateY(-3px) scale(1.02);
+	box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+	filter: brightness(1.1);
 	color: #fff;
 }
-.meowpack-share__btn:active {
-	transform: translateY(0);
-	opacity: 1;
-}
-.meowpack-share__icon svg {
-	width: 16px;
-	height: 16px;
-	display: block;
-}
+.meowpack-share__btn:active { transform: translateY(0); }
 
-/* ── Icon Only style ── */
 .meowpack-share--icon-only .meowpack-share__btn {
-	padding: 9px;
-	border-radius: 50%;
-	width: 36px;
-	height: 36px;
+	padding: 0;
+	width: 42px;
+	height: 42px;
 	justify-content: center;
-}
-.meowpack-share--icon-only .meowpack-share__icon svg {
-	width: 17px;
-	height: 17px;
-}
-
-/* ── Pill Button style ── */
-.meowpack-share--pill-button .meowpack-share__btn {
-	border-radius: 999px;
-	padding: 8px 18px;
+	border-radius: 50%;
 }
 
 /* =========================================================
-   Trending Widget
+   Reactions
    ========================================================= */
-.meowpack-trending {
-	margin: 0;
-}
-.meowpack-trending__title {
-	font-size: 16px;
-	font-weight: 700;
-	margin-bottom: 12px;
-}
-.meowpack-trending__list {
-	list-style: decimal;
-	padding-left: 20px;
-	margin: 0;
-}
-.meowpack-trending__item {
-	padding: 6px 0;
-	font-size: 14px;
-	border-bottom: 1px solid #e2e8f0;
+.meowpack-reactions {
 	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 8px;
-}
-.meowpack-trending__item:last-child { border-bottom: none; }
-.meowpack-trending__item a {
-	text-decoration: none;
-	flex: 1;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.meowpack-trending__views {
-	font-size: 12px;
-	color: #64748b;
-	white-space: nowrap;
-}
-
-/* =========================================================
-   Public Counter Widget
-   ========================================================= */
-.meowpack-counter-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+	flex-wrap: wrap;
 	gap: 12px;
-	font-family: 'Inter', sans-serif;
+	margin: 40px 0;
+	padding: 24px;
+	background: #fff;
+	border-radius: 20px;
+	border: 1px solid #f1f5f9;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+	justify-content: center;
+	font-family: var(--mp-font);
 }
-
-.meowpack-counter-box {
-	background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
-	border-radius: 12px;
-	padding: 16px 14px;
-	text-align: center;
+.meowpack-reaction-btn {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 4px;
+	gap: 6px;
+	background: #f8fafc;
+	border: 2px solid transparent;
+	padding: 12px;
+	border-radius: 16px;
+	cursor: pointer;
+	transition: all 0.2s;
+	min-width: 70px;
+}
+.meowpack-reaction-btn:hover {
+	background: #fff;
+	border-color: var(--mp-primary);
+	transform: scale(1.1);
+}
+.meowpack-reaction-btn.is-active {
+	background: #eff6ff;
+	border-color: var(--mp-primary);
+}
+.meowpack-reaction-emoji { font-size: 24px; }
+.meowpack-reaction-count { font-size: 12px; font-weight: 700; color: var(--mp-text-main); }
+
+/* =========================================================
+   Counter Widget
+   ========================================================= */
+.meowpack-counter-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+	gap: 16px;
+	font-family: var(--mp-font);
+}
+
+.meowpack-counter-box {
+	background: linear-gradient(135deg, var(--mp-primary) 0%, var(--mp-secondary) 100%);
+	border-radius: 16px;
+	padding: 24px 16px;
+	text-align: center;
 	color: #fff;
-	box-shadow: 0 4px 12px rgba(99,102,241,.25);
-	transition: transform .2s;
+	box-shadow: 0 10px 20px rgba(99,102,241,0.2);
+	transition: all 0.3s;
+	position: relative;
+	overflow: hidden;
+}
+.meowpack-counter-box::after {
+	content: '';
+	position: absolute;
+	top: -50%;
+	left: -50%;
+	width: 200%;
+	height: 200%;
+	background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+	opacity: 0;
+	transition: opacity 0.3s;
 }
 .meowpack-counter-box:hover {
-	transform: translateY(-2px);
+	transform: translateY(-5px);
+	box-shadow: 0 15px 30px rgba(99,102,241,0.3);
 }
-.meowpack-counter-box__icon {
-	font-size: 22px;
-	line-height: 1;
-}
+.meowpack-counter-box:hover::after { opacity: 1; }
+
 .meowpack-counter-box__number {
-	font-size: 28px;
-	font-weight: 700;
-	line-height: 1.1;
+	font-size: 32px;
+	font-weight: 800;
+	margin-bottom: 4px;
 }
 .meowpack-counter-box__label {
-	font-size: 11px;
-	font-weight: 500;
-	opacity: .85;
-	text-align: center;
-	line-height: 1.3;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	opacity: 0.9;
 }
 
 /* =========================================================
    Responsive
    ========================================================= */
 @media (max-width: 480px) {
-	.meowpack-share { gap: 6px; }
-	.meowpack-share__btn { font-size: 12px; padding: 7px 11px; }
+	.meowpack-post-meta-bar { padding: 10px 15px; gap: 12px; }
 	.meowpack-counter-grid { grid-template-columns: repeat(2, 1fr); }
+	.meowpack-reaction-btn { min-width: 60px; padding: 10px; }
 }

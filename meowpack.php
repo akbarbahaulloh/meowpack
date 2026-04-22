@@ -82,6 +82,7 @@ function meowpack_load_files() {
 	$includes = array(
 		// Core infrastructure (load first).
 		'includes/class-meowpack-database.php',
+		'includes/class-meowpack-mmdb-reader.php',
 		'includes/class-meowpack-bot-filter.php',
 		'includes/class-meowpack-device-detector.php',   // v2.0.0
 		'includes/class-meowpack-ai-bot-manager.php',    // v2.0.0

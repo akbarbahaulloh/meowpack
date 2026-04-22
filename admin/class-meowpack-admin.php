@@ -64,8 +64,6 @@ class MeowPack_Admin {
 		add_submenu_page( 'meowpack', __( 'Captcha', 'meowpack' ),             __( 'Captcha', 'meowpack' ),             'manage_options', 'meowpack-captcha',              array( $this, 'page_captcha' ) );
 		add_submenu_page( 'meowpack', __( 'Filter Konten', 'meowpack' ),       __( 'Filter Konten', 'meowpack' ),       'manage_options', 'meowpack-content-moderation',  array( $this, 'page_content_moderation' ) );
 		add_submenu_page( 'meowpack', __( 'Malware Scanner', 'meowpack' ),     __( 'Malware Scanner', 'meowpack' ),      'manage_options', 'meowpack-malware-scanner',      array( $this, 'page_malware_scanner' ) );
-		// Sub-menu hidden (moved to settings)
-		// add_submenu_page( 'meowpack', __( 'Import Jetpack', 'meowpack' ),    __( 'Import Jetpack', 'meowpack' ),      'manage_options', 'meowpack-importer',             array( $this, 'page_importer' ) );
 	}
 
 	/**
@@ -127,10 +125,7 @@ class MeowPack_Admin {
 				'exportUrl' => admin_url( 'admin.php?page=meowpack&meowpack_export=1' ),
 				'exportNonce' => wp_create_nonce( 'meowpack_csv_export' ),
 				'strings' => array(
-					'importing'  => __( 'Mengimpor...', 'meowpack' ),
-					'done'       => __( 'Selesai!', 'meowpack' ),
 					'error'      => __( 'Terjadi kesalahan.', 'meowpack' ),
-					'noData'     => __( 'Tidak ada data Jetpack yang ditemukan.', 'meowpack' ),
 				),
 			)
 		);
@@ -530,13 +525,6 @@ class MeowPack_Admin {
 	 */
 	public function page_autoshare() {
 		require_once MEOWPACK_DIR . 'admin/views/page-autoshare.php';
-	}
-
-	/**
-	 * Importer page.
-	 */
-	public function page_importer() {
-		require_once MEOWPACK_DIR . 'admin/views/page-importer.php';
 	}
 
 	// -------------------------------------------------------------------------

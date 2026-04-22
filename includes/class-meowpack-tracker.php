@@ -192,8 +192,8 @@ class MeowPack_Tracker {
 
 	/**
 	 * Geo-locate an IP address.
-	 * Uses ip-api.com (free, region + city available).
-	 * For production, swap with local MaxMind GeoLite2-City.mmdb.
+	 * 1. Checks for local MaxMind GeoLite2-City.mmdb in includes/data/geoip/
+	 * 2. Falls back to ip-api.com (free API).
 	 *
 	 * @param string $ip IP address.
 	 * @return array{ country_code: string, region: string, city: string }
@@ -212,12 +212,33 @@ class MeowPack_Tracker {
 			return $cached;
 		}
 
+		$result = $empty;
+
+		// --- 1. Attempt Local MaxMind MMDB (if file exists) ---
+		$mmdb_path = MEOWPACK_PATH . 'includes/data/geoip/GeoLite2-City.mmdb';
+		if ( file_exists( $mmdb_path ) && class_exists( 'MeowPack_MMDB_Reader' ) ) {
+			try {
+				$reader = new MeowPack_MMDB_Reader( $mmdb_path );
+				$record = $reader->get( $ip );
+				if ( $record ) {
+					$result['country_code'] = $record['country']['iso_code'] ?? '';
+					$result['region']       = $record['subdivisions'][0]['names']['en'] ?? '';
+					$result['city']         = $record['city']['names']['en'] ?? '';
+					
+					set_transient( $cache_key, $result, MONTH_IN_SECONDS );
+					return $result;
+				}
+			} catch ( Exception $e ) {
+				// Fallback to API on error.
+			}
+		}
+
+		// --- 2. Fallback to external API (ip-api.com) ---
 		$response = wp_remote_get(
 			'http://ip-api.com/json/' . rawurlencode( $ip ) . '?fields=countryCode,regionName,city',
 			array( 'timeout' => 3, 'sslverify' => false )
 		);
 
-		$result = $empty;
 		if ( ! is_wp_error( $response ) ) {
 			$body = json_decode( wp_remote_retrieve_body( $response ), true );
 			if ( ! empty( $body['countryCode'] ) ) {

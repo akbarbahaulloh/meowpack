@@ -69,11 +69,17 @@ class MeowPack_Stats {
 					"SELECT
 						COUNT(DISTINCT ip_hash) AS unique_visitors,
 						COUNT(*) AS total_views,
+						MAX(author_id) AS author_id,
 						SUM(source_type = 'direct') AS source_direct,
 						SUM(source_type = 'search') AS source_search,
 						SUM(source_type = 'social') AS source_social,
 						SUM(source_type = 'referral') AS source_referral,
-						SUM(source_type = 'email') AS source_email
+						SUM(source_type = 'email') AS source_email,
+						SUM(device_type = 'mobile') AS mobile_views,
+						SUM(device_type = 'tablet') AS tablet_views,
+						SUM(device_type = 'desktop') AS desktop_views,
+						ROUND(AVG(time_on_page)) AS avg_time_on_page,
+						ROUND(AVG(scroll_depth)) AS avg_scroll_depth
 					FROM {$visits_table}
 					WHERE visit_date = %s AND is_bot = 0" . $where_post,
 					$date
@@ -88,19 +94,27 @@ class MeowPack_Stats {
 			$wpdb->replace( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 				$stats_table,
 				array(
-					'stat_date'       => $date,
-					'post_id'         => $post_id,
-					'unique_visitors' => (int) $row['unique_visitors'],
-					'total_views'     => (int) $row['total_views'],
-					'source_direct'   => (int) $row['source_direct'],
-					'source_search'   => (int) $row['source_search'],
-					'source_social'   => (int) $row['source_social'],
-					'source_referral' => (int) $row['source_referral'],
-					'source_email'    => (int) $row['source_email'],
+					'stat_date'        => $date,
+					'post_id'          => $post_id,
+					'author_id'        => (int) $row['author_id'],
+					'unique_visitors'  => (int) $row['unique_visitors'],
+					'total_views'      => (int) $row['total_views'],
+					'source_direct'    => (int) $row['source_direct'],
+					'source_search'    => (int) $row['source_search'],
+					'source_social'    => (int) $row['source_social'],
+					'source_referral'  => (int) $row['source_referral'],
+					'source_email'     => (int) $row['source_email'],
+					'mobile_views'     => (int) $row['mobile_views'],
+					'tablet_views'     => (int) $row['tablet_views'],
+					'desktop_views'    => (int) $row['desktop_views'],
+					'avg_time_on_page' => (int) $row['avg_time_on_page'],
+					'avg_scroll_depth' => (int) $row['avg_scroll_depth'],
 				),
-				array( '%s', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d' )
+				array( '%s', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d' )
 			);
 		}
+
+		// Bust transient caches after aggregation.
 
 		// Bust transient caches after aggregation.
 		$this->flush_stat_caches();
