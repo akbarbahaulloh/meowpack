@@ -648,6 +648,34 @@ class MeowPack_Stats {
 	}
 
 	/**
+	 * Get detailed view count for a specific post (total and daily).
+	 * Used for Top-10 style formatted text.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array{ total: int, daily: int }
+	 */
+	public function get_post_views_detailed( $post_id ) {
+		$post_id = absint( $post_id );
+		global $wpdb;
+		$table = $wpdb->prefix . 'meow_post_views';
+
+		// We can query the extremely fast flat table directly.
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT total_views, daily_views, view_date FROM {$table} WHERE post_id = %d", $post_id ) );
+		
+		$total = 0;
+		$daily = 0;
+
+		if ( $row ) {
+			$total = (int) $row->total_views;
+			if ( $row->view_date === current_time( 'Y-m-d' ) ) {
+				$daily = (int) $row->daily_views;
+			}
+		}
+
+		return array( 'total' => $total, 'daily' => $daily );
+	}
+
+	/**
 	 * Get total comments count for a period.
 	 */
 	public function get_total_comments( $period = 'alltime' ) {

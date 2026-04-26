@@ -60,7 +60,18 @@ $s = function( $key, $default = '' ) {
 							<option value="bottom" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'bottom' ); ?>><?php esc_html_e( 'Otomatis di Bawah Artikel', 'meowpack' ); ?></option>
 							<option value="hidden" <?php selected( $s( 'show_post_meta_bar', 'top' ), 'hidden' ); ?>><?php esc_html_e( 'Sembunyikan Total', 'meowpack' ); ?></option>
 						</select>
-						<p class="description" style="margin-bottom: 15px;"><?php esc_html_e( 'Menampilkan: "📈 1.250 Dilihat • ⏱️ Estimasi Baca: 3 Menit".', 'meowpack' ); ?></p>
+
+						<div style="margin-top: 15px; margin-bottom: 15px; padding-left: 10px; border-left: 3px solid #007cba;">
+							<strong><?php esc_html_e( 'Format Teks Views', 'meowpack' ); ?></strong><br>
+							<input type="text" name="views_format_text" class="regular-text" style="width: 100%; max-width: 400px; margin-top: 5px;" value="<?php echo esc_attr( $s( 'views_format_text', '{icon} {total} Dilihat' ) ); ?>">
+							<p class="description" style="margin-top: 5px;"><?php esc_html_e( 'Placeholder: {total}, {daily}, {icon}. Contoh Top-10: Total dibaca {total}x, dibaca hari ini {daily}x', 'meowpack' ); ?></p>
+						</div>
+
+						<div style="margin-bottom: 15px; padding-left: 10px; border-left: 3px solid #007cba;">
+							<strong><?php esc_html_e( 'Format Teks Reading Time', 'meowpack' ); ?></strong><br>
+							<input type="text" name="reading_time_format_text" class="regular-text" style="width: 100%; max-width: 400px; margin-top: 5px;" value="<?php echo esc_attr( $s( 'reading_time_format_text', '⏱️ Estimasi Baca: {minutes} Menit' ) ); ?>">
+							<p class="description" style="margin-top: 5px;"><?php esc_html_e( 'Placeholder: {minutes}. Contoh: Waktu baca: {minutes} menit aja', 'meowpack' ); ?></p>
+						</div>
 						
 						<?php
 						$all_types = array( 'post' => 'Pos', 'page' => 'Halaman', 'attachment' => 'Media' );

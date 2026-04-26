@@ -92,15 +92,18 @@ class MeowPack_Frontend_Enhancer {
 			// Use the Top-10 dynamic document.write approach to bypass cache completely
 			$ajax_url = admin_url( 'admin-ajax.php' );
 			$script_tag = sprintf( '<script type="text/javascript" data-cfasync="false" src="%s?action=meowpack_get_views&post_id=%d"></script>', $ajax_url, $post_id );
-			$html .= '<span title="Berdasarkan lalu lintas pengunjung">📈 ' . $script_tag . '</span>';
+			$html .= '<span title="Berdasarkan lalu lintas pengunjung">' . $script_tag . '</span>';
 		}
 
 		if ( $show_read ) {
 			$word_count = str_word_count( wp_strip_all_tags( $content ) );
 			$wpm = 200;
 			$minutes = max( 1, ceil( $word_count / $wpm ) );
-			$reading_txt = sprintf( esc_html__( 'Estimasi Baca: %d Menit', 'meowpack' ), $minutes );
-			$html .= '<span title="Berdasarkan 200 kata per menit">⏱️ ' . esc_html( $reading_txt ) . '</span>';
+			
+			$format = MeowPack_Database::get_setting( 'reading_time_format_text', '⏱️ Estimasi Baca: {minutes} Menit' );
+			$reading_txt = str_replace( '{minutes}', $minutes, $format );
+			
+			$html .= '<span title="Berdasarkan 200 kata per menit">' . esc_html( $reading_txt ) . '</span>';
 		}
 
 		$html .= '</div>';

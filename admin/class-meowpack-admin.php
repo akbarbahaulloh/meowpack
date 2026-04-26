@@ -173,6 +173,8 @@ class MeowPack_Admin {
 			'show_share_buttons_on' => 'array',
 			'show_toc'              => 'sanitize_text_field',
 			'enable_related_posts'  => 'absint',
+			'views_format_text'        => 'sanitize_textarea_field',
+			'reading_time_format_text' => 'sanitize_textarea_field',
 		);
 
 		// Handle missing array fields (when all checkboxes are unchecked)

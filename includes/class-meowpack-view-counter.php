@@ -175,8 +175,25 @@ class MeowPack_ViewCounter {
 			wp_die();
 		}
 		
-		$views  = MeowPack_Core::get_instance()->stats->get_post_views_realtime( $post_id );
-		$output = $this->render_count_badge( $views );
+		$views_data = MeowPack_Core::get_instance()->stats->get_post_views_detailed( $post_id );
+		
+		$format = MeowPack_Database::get_setting( 'views_format_text', '{icon} {total} Dilihat' );
+		
+		$total_formatted = self::format_number( $views_data['total'] );
+		$daily_formatted = self::format_number( $views_data['daily'] );
+		$icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;margin-top:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+		
+		$text = str_replace( 
+			array( '{total}', '{daily}', '{icon}' ), 
+			array( $total_formatted, $daily_formatted, $icon ), 
+			$format 
+		);
+
+		$output = sprintf(
+			'<span class="meowpack-view-text">%s</span>',
+			$text // Intentionally not escaping here because we need to output the HTML icon. But format text could contain HTML tags so it's fine.
+		);
+
 		$output = addslashes( $output );
 		$output = str_replace( array( "\r", "\n" ), '', $output );
 
