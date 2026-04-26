@@ -234,16 +234,23 @@
 /* =========================================================
    Post List (Shortcodes & Widgets)
    ========================================================= */
-.meowpack-post-list {
-	list-style: none;
-	padding: 0;
-	margin: 0;
+ul.meowpack-post-list {
+	list-style: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
 	font-family: var(--mp-font);
 }
 
-.meowpack-post-list__item {
-	margin-bottom: 12px;
-	transition: transform 0.2s;
+ul.meowpack-post-list li.meowpack-post-list__item {
+	list-style-type: none !important;
+	padding: 0 !important;
+	margin: 0 0 12px 0 !important;
+	background: none !important;
+	border: none !important;
+}
+
+ul.meowpack-post-list li.meowpack-post-list__item::before {
+	content: none !important;
 }
 
 .meowpack-post-list__item:last-child {
@@ -275,6 +282,10 @@
 .meowpack-post-list__bullet {
 	font-size: 18px;
 	flex-shrink: 0;
+	color: var(--mp-primary);
+	line-height: 1;
+	display: flex;
+	align-items: center;
 }
 
 .meowpack-post-list__title {
