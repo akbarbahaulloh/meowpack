@@ -274,6 +274,51 @@ $s = function( $key, $default = '' ) {
 		</p>
 	</form>
 
+	<!-- Shortcode Documentation -->
+	<div class="meowpack-settings-section" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #dee2e6; padding: 30px; border-radius: 16px; margin-top: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+		<h2 style="margin-top:0; display:flex; align-items:center; gap:10px;">🧩 <?php esc_html_e( 'Shortcodes & Embed Code', 'meowpack' ); ?></h2>
+		<p class="description" style="font-size:1.1em; color:#475569; margin-bottom:20px;">
+			<?php esc_html_e( 'Gunakan shortcode di bawah ini untuk menampilkan daftar artikel atau statistik di mana saja (Post, Page, atau Modul Code/Text Divi).', 'meowpack' ); ?>
+		</p>
+
+		<div class="meowpack-doc-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
+			<!-- Recent Posts -->
+			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+				<h3 style="margin-top:0;">✨ <?php esc_html_e( 'Artikel Terbaru', 'meowpack' ); ?></h3>
+				<code>[meowpack_recent count="5"]</code>
+				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Menampilkan daftar judul artikel terbaru dengan gaya premium.', 'meowpack' ); ?></p>
+			</div>
+
+			<!-- Random Posts -->
+			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+				<h3 style="margin-top:0;">🎲 <?php esc_html_e( 'Artikel Acak', 'meowpack' ); ?></h3>
+				<code>[meowpack_random count="5"]</code>
+				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Menampilkan artikel secara acak untuk meningkatkan dwell time pengunjung.', 'meowpack' ); ?></p>
+			</div>
+
+			<!-- Popular Posts -->
+			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+				<h3 style="margin-top:0;">🔥 <?php esc_html_e( 'Artikel Populer', 'meowpack' ); ?></h3>
+				<code>[meowpack_popular count="5"]</code>
+				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Menampilkan artikel yang paling banyak dibaca dalam 7 hari terakhir.', 'meowpack' ); ?></p>
+			</div>
+
+			<!-- Visitor Counter -->
+			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+				<h3 style="margin-top:0;">👁️ <?php esc_html_e( 'Statistik Pengunjung', 'meowpack' ); ?></h3>
+				<code>[meowpack_counter type="all"]</code>
+				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Pilihan type: today, month, total, pageviews, atau all.', 'meowpack' ); ?></p>
+			</div>
+
+			<!-- Table of Contents -->
+			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+				<h3 style="margin-top:0;">📋 <?php esc_html_e( 'Daftar Isi (TOC)', 'meowpack' ); ?></h3>
+				<code>[meow_toc]</code>
+				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Gunakan ini jika Anda memilih mode "Manual via Shortcode" di pengaturan di atas.', 'meowpack' ); ?></p>
+			</div>
+		</div>
+	</div>
+
 	<hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
 
 	<!-- MeowSync Engine -->

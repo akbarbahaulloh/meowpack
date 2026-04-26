@@ -97,6 +97,7 @@ function meowpack_load_files() {
 		// v2.0.0 new modules.
 		'includes/class-meowpack-click-tracker.php',
 		'includes/class-meowpack-reading-time.php',
+		'includes/class-meowpack-shortcodes.php',
 		'includes/class-meowpack-anti-hotlink.php',
 		'includes/class-meowpack-captcha.php',
 		'includes/class-meowpack-content-moderation.php',
@@ -134,6 +135,7 @@ function meowpack_init() {
 		register_widget( 'MeowPack_Stats_Widget' );
 		register_widget( 'MeowPack_Popular_Widget' );
 		register_widget( 'MeowPack_Random_Widget' );
+		register_widget( 'MeowPack_Recent_Widget' );
 	} );
 }
 add_action( 'plugins_loaded', 'meowpack_init' );
