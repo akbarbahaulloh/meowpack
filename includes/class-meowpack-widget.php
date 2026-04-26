@@ -65,11 +65,11 @@ class MeowPack_Stats_Widget extends WP_Widget {
 		$show_types = $instance['show_types'] ?? array( 'today', 'month', 'total', 'pageviews' );
 
 		$type_options = array(
-			'today'     => __( 'Pengunjung Hari Ini', 'meowpack' ),
-			'month'     => __( 'Pengunjung Bulan Ini', 'meowpack' ),
-			'year'      => __( 'Pengunjung Tahun Ini', 'meowpack' ),
-			'total'     => __( 'Total Pengunjung', 'meowpack' ),
-			'pageviews' => __( 'Total Halaman Dibaca', 'meowpack' ),
+			'today'     => __( 'Hari ini', 'meowpack' ),
+			'week'      => __( 'Minggu ini', 'meowpack' ),
+			'month'     => __( 'Bulan ini', 'meowpack' ),
+			'year'      => __( 'Tahun ini', 'meowpack' ),
+			'total'     => __( 'Sepanjang waktu', 'meowpack' ),
 		);
 		?>
 		<p>
@@ -106,7 +106,7 @@ class MeowPack_Stats_Widget extends WP_Widget {
 	public function update( $new_instance, $old_instance ) {
 		$instance               = array();
 		$instance['title']      = sanitize_text_field( $new_instance['title'] ?? '' );
-		$allowed_types          = array( 'today', 'month', 'year', 'total', 'pageviews' );
+		$allowed_types          = array( 'today', 'week', 'month', 'year', 'total' );
 		$selected               = array_intersect( (array) ( $new_instance['show_types'] ?? array() ), $allowed_types );
 		$instance['show_types'] = $selected;
 		return $instance;
@@ -134,37 +134,36 @@ class MeowPack_Stats_Widget extends WP_Widget {
 		$data = array(
 			'today'     => array(
 				'value' => $today['unique_visitors'],
-				'label' => __( 'Pengunjung Hari Ini', 'meowpack' ),
-				'icon'  => '👁',
+				'label' => __( 'Hari ini', 'meowpack' ),
+			),
+			'week'      => array(
+				'value' => MeowPack_Core::get_instance()->stats->get_sitewide_stats( 'week' )['unique_visitors'],
+				'label' => __( 'Minggu ini', 'meowpack' ),
 			),
 			'month'     => array(
 				'value' => $month['unique_visitors'],
-				'label' => __( 'Pengunjung Bulan Ini', 'meowpack' ),
-				'icon'  => '📅',
+				'label' => __( 'Bulan ini', 'meowpack' ),
 			),
 			'year'      => array(
 				'value' => $year['unique_visitors'],
-				'label' => __( 'Pengunjung Tahun Ini', 'meowpack' ),
-				'icon'  => '📆',
+				'label' => __( 'Tahun ini', 'meowpack' ),
 			),
 			'total'     => array(
 				'value' => $alltime['unique_visitors'],
-				'label' => __( 'Total Pengunjung', 'meowpack' ),
-				'icon'  => '👥',
+				'label' => __( 'Sepanjang waktu', 'meowpack' ),
 			),
 			'pageviews' => array(
 				'value' => $alltime['total_views'],
-				'label' => __( 'Total Halaman Dibaca', 'meowpack' ),
-				'icon'  => '📄',
+				'label' => __( 'Total halaman dibaca', 'meowpack' ),
 			),
 		);
 
 		$types = (array) $types;
 		if ( in_array( 'all', $types, true ) ) {
-			$types = array( 'today', 'month', 'year', 'total', 'pageviews' );
+			$types = array( 'today', 'week', 'month', 'year', 'total' );
 		}
 
-		$html = '<div class="meowpack-counter-grid">';
+		$html = '<ul class="meowpack-stats-list" style="list-style:none; padding:0; margin:0;">';
 
 		foreach ( $types as $type ) {
 			if ( ! isset( $data[ $type ] ) ) {
@@ -175,18 +174,16 @@ class MeowPack_Stats_Widget extends WP_Widget {
 			$formatted = MeowPack_ViewCounter::format_number( $item['value'] );
 
 			$html .= sprintf(
-				'<div class="meowpack-counter-box">
-					<span class="meowpack-counter-box__icon">%s</span>
-					<span class="meowpack-counter-box__number">%s</span>
-					<span class="meowpack-counter-box__label">%s</span>
-				</div>',
-				esc_html( $item['icon'] ),
-				esc_html( $formatted ),
-				esc_html( $item['label'] )
+				'<li class="meowpack-stats-list__item" style="padding: 4px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between;">
+					<span class="meowpack-stats-list__label">%s</span>
+					<span class="meowpack-stats-list__number" style="font-weight: bold;">%s</span>
+				</li>',
+				esc_html( $item['label'] ),
+				esc_html( $formatted )
 			);
 		}
 
-		$html .= '</div>';
+		$html .= '</ul>';
 
 		set_transient( $cache_key, $html, 5 * MINUTE_IN_SECONDS );
 
