@@ -158,14 +158,17 @@ class MeowPack_Frontend_Enhancer {
 	private function build_toc_html( $items ) {
 		if ( empty( $items ) ) return '';
 
-		$html = '<div class="meowpack-toc" style="background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:20px; margin:24px 0;">';
-		$html .= '<h3 style="margin-top:0; margin-bottom:16px; font-size:1.1em;">📑 ' . esc_html__( 'Daftar Isi', 'meowpack' ) . '</h3>';
-		$html .= '<ul style="list-style:none; padding-left:0; margin-bottom:0;">';
+		// Enqueue public styles.
+		wp_enqueue_style( 'meowpack-public', MEOWPACK_URL . 'public/assets/meowpack-public.css', array(), MEOWPACK_VERSION );
+
+		$html = '<div class="meowpack-toc">';
+		$html .= '<h3 class="meowpack-toc__title">📑 ' . esc_html__( 'Daftar Isi', 'meowpack' ) . '</h3>';
+		$html .= '<ul class="meowpack-toc__list">';
 		
 		foreach ( $items as $item ) {
-			$padding = ( $item['level'] === 3 ) ? 'padding-left:20px;' : 'font-weight:600;';
-			$html .= '<li style="margin-bottom:8px; ' . $padding . '">';
-			$html .= '<a href="#' . esc_attr( $item['id'] ) . '" style="text-decoration:none;">' . esc_html( $item['text'] ) . '</a>';
+			$class = ( $item['level'] === 3 ) ? 'meowpack-toc__item meowpack-toc__item--h3' : 'meowpack-toc__item';
+			$html .= '<li class="' . $class . '">';
+			$html .= '<a href="#' . esc_attr( $item['id'] ) . '" class="meowpack-toc__link">' . esc_html( $item['text'] ) . '</a>';
 			$html .= '</li>';
 		}
 		
