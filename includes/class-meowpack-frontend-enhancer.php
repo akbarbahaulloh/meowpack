@@ -89,9 +89,10 @@ class MeowPack_Frontend_Enhancer {
 		$html = '<div class="meowpack-post-meta" style="display:flex; gap:16px; padding:12px 16px; background:rgba(0,0,0,0.03); border-radius:8px; margin:20px 0; font-size:0.9em; font-weight:500;">';
 
 		if ( $show_views ) {
-			$views = MeowPack_Core::get_instance()->stats->get_post_views( $post_id );
-			$views_txt = number_format_i18n( $views ) . ' ' . esc_html__( 'Dilihat', 'meowpack' );
-			$html .= '<span title="Berdasarkan lalu lintas pengunjung">📈 ' . esc_html( $views_txt ) . '</span>';
+			// Use the Top-10 dynamic document.write approach to bypass cache completely
+			$ajax_url = admin_url( 'admin-ajax.php' );
+			$script_tag = sprintf( '<script type="text/javascript" data-cfasync="false" src="%s?action=meowpack_get_views&post_id=%d"></script>', $ajax_url, $post_id );
+			$html .= '<span title="Berdasarkan lalu lintas pengunjung">📈 ' . $script_tag . '</span>';
 		}
 
 		if ( $show_read ) {

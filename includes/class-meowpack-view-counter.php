@@ -29,6 +29,9 @@ class MeowPack_ViewCounter {
 		// with the new Frontend Enhancer module.
 		add_shortcode( 'meowpack_views', array( $this, 'shortcode_views' ) );
 		add_shortcode( 'meowpack_trending', array( $this, 'shortcode_trending' ) );
+
+		add_action( 'wp_ajax_nopriv_meowpack_get_views', array( $this, 'ajax_get_views' ) );
+		add_action( 'wp_ajax_meowpack_get_views', array( $this, 'ajax_get_views' ) );
 	}
 
 	/**
@@ -58,8 +61,12 @@ class MeowPack_ViewCounter {
 			return $content;
 		}
 
-		$views = MeowPack_Core::get_instance()->stats->get_post_views( $post_id );
-		$html  = $this->render_count_badge( $views );
+		$ajax_url = admin_url( 'admin-ajax.php' );
+		$html = sprintf(
+			'<div class="meowpack-view-count" id="meowpack-view-count-%1$d"><script type="text/javascript" data-cfasync="false" src="%2$s?action=meowpack_get_views&post_id=%1$d"></script></div>',
+			$post_id,
+			$ajax_url
+		);
 
 		return $html . $content;
 	}
@@ -87,8 +94,12 @@ class MeowPack_ViewCounter {
 			return '';
 		}
 
-		$views = MeowPack_Core::get_instance()->stats->get_post_views( $post_id, $period );
-		return $this->render_count_badge( $views );
+		$ajax_url = admin_url( 'admin-ajax.php' );
+		return sprintf(
+			'<div class="meowpack-view-count" id="meowpack-view-count-%1$d"><script type="text/javascript" data-cfasync="false" src="%2$s?action=meowpack_get_views&post_id=%1$d"></script></div>',
+			$post_id,
+			$ajax_url
+		);
 	}
 
 	/**
@@ -149,10 +160,29 @@ class MeowPack_ViewCounter {
 		$label     = __( 'dibaca', 'meowpack' );
 
 		return sprintf(
-			'<div class="meowpack-view-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>%s %s</span></div>',
+			'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;margin-top:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>%s %s</span>',
 			esc_html( $formatted ),
 			esc_html( $label )
 		);
+	}
+
+	/**
+	 * Output dynamic view count via document.write (Top-10 style).
+	 */
+	public function ajax_get_views() {
+		$post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;
+		if ( ! $post_id ) {
+			wp_die();
+		}
+		
+		$views  = MeowPack_Core::get_instance()->stats->get_post_views_realtime( $post_id );
+		$output = $this->render_count_badge( $views );
+		$output = addslashes( $output );
+		$output = str_replace( array( "\r", "\n" ), '', $output );
+
+		header( 'Content-Type: application/javascript' );
+		echo 'document.write(\'' . $output . '\');';
+		exit;
 	}
 
 	/**

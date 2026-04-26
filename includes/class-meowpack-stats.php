@@ -590,6 +590,64 @@ class MeowPack_Stats {
 	}
 
 	/**
+	 * Get view count for a specific post (REAL-TIME, NO CACHE).
+	 * Used for frontend display to show accurate count immediately.
+	 * v2.2.1: Added for real-time view counter display
+	 *
+	 * @param int    $post_id Post ID.
+	 * @param string $period  alltime|this_month|this_week|today
+	 * @return int
+	 */
+	public function get_post_views_realtime( $post_id, $period = 'alltime' ) {
+		$post_id = absint( $post_id );
+
+		global $wpdb;
+		$stats_table = $wpdb->prefix . 'meow_daily_stats';
+
+		switch ( $period ) {
+			case 'today':
+				$where = $wpdb->prepare( ' AND stat_date = %s', current_time( 'Y-m-d' ) );
+				break;
+			case 'this_week':
+				$now_ts = current_time( 'timestamp' );
+				$monday = date( 'Y-m-d', strtotime( 'monday this week', $now_ts ) );
+				$where = $wpdb->prepare( ' AND stat_date >= %s', $monday );
+				break;
+			case 'this_month':
+				$start = current_time( 'Y-m' ) . '-01';
+				$where = $wpdb->prepare( ' AND stat_date >= %s', $start );
+				break;
+			case 'this_year':
+				$start = current_time( 'Y' ) . '-01-01';
+				$where = $wpdb->prepare( ' AND stat_date >= %s', $start );
+				break;
+			default:
+				$where = '';
+		}
+
+		$visits_table = $wpdb->prefix . 'meow_visits';
+		$today        = current_time( 'Y-m-d' );
+
+		$views_today = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$visits_table} WHERE visit_date = %s AND is_bot = 0 AND post_id = %d",
+				$today,
+				$post_id
+			)
+		);
+
+		$views_agg = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT SUM(total_views) FROM {$stats_table} WHERE post_id = %d" . $where, // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$post_id
+			)
+		);
+
+		// NO CACHE - returns fresh count every time for real-time display
+		return $views_today + $views_agg;
+	}
+
+	/**
 	 * Get total comments count for a period.
 	 */
 	public function get_total_comments( $period = 'alltime' ) {
@@ -851,5 +909,29 @@ class MeowPack_Stats {
 			),
 			ARRAY_A
 		);
+	}
+
+	/**
+	 * Get post views from the simple wp_meow_post_views table (real-time, no cache).
+	 * This is the new approach for instant display without timing issues.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return int Total views.
+	 */
+	public function get_post_views_simple( $post_id ) {
+		$post_id = absint( $post_id );
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'meow_post_views';
+
+		// Query directly from simple counter table (no cache, real-time).
+		$total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT SUM(total_views) FROM {$table} WHERE post_id = %d",
+				$post_id
+			)
+		);
+
+		return $total;
 	}
 }

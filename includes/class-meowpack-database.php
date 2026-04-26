@@ -230,6 +230,20 @@ class MeowPack_Database {
 			INDEX idx_ip_post (ip_hash, post_id)
 		) $charset;";
 
+		// -----------------------------------------------------------------------
+		// [NEW v2.2.1] Table: simple post views counter (for real-time display).
+		// Direct counter update on tracking (no aggregation delay).
+		// -----------------------------------------------------------------------
+		$sql_post_views = "CREATE TABLE {$wpdb->prefix}meow_post_views (
+			post_id BIGINT UNSIGNED NOT NULL,
+			total_views BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			daily_views BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			view_date DATE NOT NULL,
+			PRIMARY KEY (post_id, view_date),
+			INDEX idx_post (post_id),
+			INDEX idx_date (view_date)
+		) $charset;";
+
 		dbDelta( $sql_visits );
 		dbDelta( $sql_daily );
 		dbDelta( $sql_share_logs );
@@ -239,6 +253,7 @@ class MeowPack_Database {
 		dbDelta( $sql_bot_rules );
 		dbDelta( $sql_bot_stats );
 		dbDelta( $sql_hotlink_logs );
+		dbDelta( $sql_post_views );
 
 		// -----------------------------------------------------------------------
 		// [NEW v2.1.0] Table: content moderation keyword dictionary.

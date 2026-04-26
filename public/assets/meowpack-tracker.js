@@ -1,8 +1,8 @@
 /**
- * MeowPack Tracker v2.0.0 — non-blocking, < 5KB, injected in footer.
+ * MeowPack Tracker v2.2.1 — non-blocking, < 5KB, injected in footer.
  *
  * Features:
- *  1. Visit tracking (fire-and-forget, session-deduplicated).
+ *  1. Visit tracking via AJAX (fire-and-forget, session-deduplicated).
  *  2. Engagement: actual time-on-page (30s heartbeat) + scroll depth.
  *  3. Outbound click tracking (links to external domains).
  */
@@ -16,36 +16,36 @@
 	if (!pid) return;
 
 	/* -----------------------------------------------------------------------
-	 * 1. VISIT TRACKING
-	 * Deduplicated per post per session via sessionStorage.
+	 * 1. VISIT TRACKING (AJAX)
+	 * Always tracks on page load (mimics Top-10 plugin behavior)
 	 ----------------------------------------------------------------------- */
-	var sessionKey = 'mp_' + pid;
-	var alreadyTracked = sessionStorage && sessionStorage.getItem(sessionKey);
+	var alreadyTracked = false; // Disabled session deduplication per user request
 
 	if (!alreadyTracked) {
-		if (sessionStorage) sessionStorage.setItem(sessionKey, '1');
-
 		var url     = new URL(location.href);
 		var payload = {
-			post_id:      parseInt(pid, 10),
-			referrer:     d.referrer || '',
-			utm_source:   url.searchParams.get('utm_source')   || '',
-			utm_medium:   url.searchParams.get('utm_medium')   || '',
-			utm_campaign: url.searchParams.get('utm_campaign') || '',
-			nonce:        data.nonce,
+			action:        'meowpack_track',
+			post_id:       parseInt(pid, 10),
+			referrer:      d.referrer || '',
+			utm_source:    url.searchParams.get('utm_source')   || '',
+			utm_medium:    url.searchParams.get('utm_medium')   || '',
+			utm_campaign:  url.searchParams.get('utm_campaign') || '',
 		};
 
-		// Use sendBeacon if available (survives page navigation), else fetch.
-		if (navigator.sendBeacon) {
-			navigator.sendBeacon(
-				data.endpoint,
-				new Blob([JSON.stringify(payload)], { type: 'application/json' })
-			);
+		// Use jQuery.post if jQuery is available, else fetch.
+		if (window.jQuery) {
+			jQuery.post(data.ajax_url, payload).fail(function () { /* silent fail */ });
 		} else if (window.fetch) {
-			fetch(data.endpoint, {
+			// Fallback to fetch if jQuery not available.
+			var formData = new FormData();
+			for (var key in payload) {
+				if (payload.hasOwnProperty(key)) {
+					formData.append(key, payload[key]);
+				}
+			}
+			fetch(data.ajax_url, {
 				method:    'POST',
-				headers:   { 'Content-Type': 'application/json' },
-				body:      JSON.stringify(payload),
+				body:      formData,
 				keepalive: true,
 			}).catch(function () { /* silent fail */ });
 		}
