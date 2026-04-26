@@ -84,13 +84,28 @@ class MeowPack_Shortcodes {
 		);
 
 		global $wpdb;
+		$stats_table  = $wpdb->prefix . 'meow_daily_stats';
+		$visits_table = $wpdb->prefix . 'meow_visits';
+		$seven_days_ago = date( 'Y-m-d', strtotime( '-7 days' ) );
+
 		$results = $wpdb->get_results( $wpdb->prepare(
-			"SELECT post_id, SUM(total_views) as total_views 
-			 FROM {$wpdb->prefix}meow_daily_stats 
-			 WHERE stat_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
-			 GROUP BY post_id 
-			 ORDER BY total_views DESC 
-			 LIMIT %d",
+			"SELECT post_id, SUM(views) as total_views FROM (
+				SELECT post_id, SUM(total_views) as views 
+				FROM {$stats_table} 
+				WHERE stat_date >= %s AND post_id > 0
+				GROUP BY post_id
+				UNION ALL
+				SELECT post_id, COUNT(*) as views
+				FROM {$visits_table}
+				WHERE visit_date >= %s AND is_bot = 0 AND post_id > 0
+				  AND visit_date > (SELECT COALESCE(MAX(stat_date), '0000-00-00') FROM {$stats_table})
+				GROUP BY post_id
+			) as combined
+			GROUP BY post_id
+			ORDER BY total_views DESC
+			LIMIT %d",
+			$seven_days_ago,
+			$seven_days_ago,
 			absint( $atts['count'] )
 		) );
 

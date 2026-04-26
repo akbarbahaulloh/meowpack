@@ -611,11 +611,16 @@ class MeowPack_Admin {
 		}
 
 		$checkbox_fields = array(
-			'enable_captcha', 'captcha_on_comments', 'captcha_on_login',
-			'captcha_on_register', 'captcha_on_lostpassword', 'captcha_on_woo_checkout',
+			'enable_captcha', 
+			'captcha_on_comments', 
+			'captcha_on_login',
+			'captcha_on_register', 
+			'captcha_on_lostpassword', 
+			'captcha_on_woo_checkout',
 		);
 		foreach ( $checkbox_fields as $key ) {
-			MeowPack_Database::update_setting( $key, isset( $_POST[ $key ] ) ? '1' : '0' );
+			$value = isset( $_POST[ $key ] ) ? '1' : '0';
+			MeowPack_Database::update_setting( $key, $value );
 		}
 
 		if ( isset( $_POST['captcha_type'] ) ) {
@@ -880,7 +885,5 @@ class MeowPack_Admin {
 	}
 }
 
-// Instantiate on admin_menu.
-add_action( 'admin_menu', function () {
-	new MeowPack_Admin();
-}, 5 );
+// Instantiate immediately.
+new MeowPack_Admin();
