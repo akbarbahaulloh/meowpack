@@ -183,9 +183,16 @@ class MeowPack_ViewCounter {
 		$daily_formatted = self::format_number( $views_data['daily'] );
 		$icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;margin-top:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 		
+		// Menghitung estimasi baca untuk mendukung tag {minutes}
+		$post = get_post( $post_id );
+		$minutes = 1;
+		if ( $post && class_exists( 'MeowPack_Reading_Time' ) ) {
+			$minutes = MeowPack_Reading_Time::estimate_minutes( $post->post_content );
+		}
+
 		$text = str_replace( 
-			array( '{total}', '{daily}', '{icon}' ), 
-			array( $total_formatted, $daily_formatted, $icon ), 
+			array( '{total}', '{daily}', '{icon}', '{minutes}' ), 
+			array( $total_formatted, $daily_formatted, $icon, $minutes ), 
 			$format 
 		);
 

@@ -721,40 +721,107 @@ class MeowPack_Content_Moderation {
 	// Manual Scanner (AJAX Batch Processing)
 	// -----------------------------------------------------------------------
 
-	/**
-	 * AJAX endpoint for manual scanning.
-	 */
 	public function ajax_manual_scan() {
 		check_ajax_referer( 'meowpack_manual_scan', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Unauthorized' );
 		}
 
-		$step   = isset( $_POST['step'] ) ? sanitize_key( $_POST['step'] ) : ''; // posts | comments | widgets
+		$mode   = isset( $_POST['mode'] ) ? sanitize_key( $_POST['mode'] ) : ''; 
 		$offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
-		$limit  = 50;
+		$limit  = 100;
 
-		$result = array(
-			'found'       => array(),
-			'next_offset' => null, // null means done for this step.
-		);
+		global $wpdb;
 
-		switch ( $step ) {
-			case 'posts':
-				// Scans: post, page, attachment, nav_menu_item
-				$result = $this->scan_posts_batch( $offset, $limit );
-				break;
-			case 'comments':
-				$result = $this->scan_comments_batch( $offset, $limit );
-				break;
-			case 'widgets':
-				$result = $this->scan_widgets_batch();
-				break;
-			default:
-				wp_send_json_error( 'Invalid step' );
+		if ( 'get_tables' === $mode ) {
+			// Get all tables in the current database.
+			$tables = $wpdb->get_col( "SHOW TABLES" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			wp_send_json_success( array( 'tables' => $tables ) );
 		}
 
-		wp_send_json_success( $result );
+		if ( 'scan_table' === $mode ) {
+			$table = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : '';
+			if ( ! $table ) {
+				wp_send_json_error( 'No table specified' );
+			}
+
+			// Validate table exists.
+			$table_exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
+			if ( ! $table_exists ) {
+				wp_send_json_error( 'Table does not exist' );
+			}
+
+			// Find text-based columns.
+			$columns = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}`" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$text_columns = array();
+			$primary_key  = '';
+
+			foreach ( $columns as $col ) {
+				if ( 'PRI' === $col->Key && ! $primary_key ) {
+					$primary_key = $col->Field;
+				}
+				$type = strtolower( $col->Type );
+				if ( strpos( $type, 'char' ) !== false || strpos( $type, 'text' ) !== false ) {
+					$text_columns[] = $col->Field;
+				}
+			}
+
+			if ( empty( $text_columns ) ) {
+				wp_send_json_success( array( 'found' => array(), 'next_offset' => null ) );
+			}
+
+			// Build query.
+			$select_cols = $text_columns;
+			if ( $primary_key && ! in_array( $primary_key, $select_cols, true ) ) {
+				$select_cols[] = $primary_key;
+			}
+			
+			$cols_str = '`' . implode( '`, `', $select_cols ) . '`';
+			$rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				"SELECT {$cols_str} FROM `{$table}` LIMIT %d OFFSET %d",
+				$limit, $offset
+			) );
+
+			$found = array();
+			if ( ! empty( $rows ) ) {
+				foreach ( $rows as $row ) {
+					$row_text = '';
+					foreach ( $text_columns as $col ) {
+						$row_text .= $row->$col . ' ';
+					}
+
+					$match = $this->scan_text( $row_text );
+					if ( $match ) {
+						$pk_val = $primary_key ? $row->$primary_key : 'N/A';
+						
+						// Try to guess a link.
+						$link = '#';
+						$link_label = __( 'Cek Manual', 'meowpack' );
+						
+						if ( $table === $wpdb->posts ) {
+							$link = get_edit_post_link( $row->$primary_key, 'raw' );
+							$link_label = __( 'Edit Post', 'meowpack' );
+						} elseif ( $table === $wpdb->comments ) {
+							$link = get_edit_comment_link( $row->$primary_key );
+							$link_label = __( 'Edit Komentar', 'meowpack' );
+						}
+
+						$found[] = array(
+							'type'      => $table,
+							'title'     => $primary_key . ': ' . $pk_val,
+							'keyword'   => $match['keyword'],
+							'category'  => $match['category'],
+							'link'      => $link ?: '#',
+							'linkLabel' => $link_label,
+						);
+					}
+				}
+			}
+
+			$next_offset = ( count( $rows ) < $limit ) ? null : $offset + $limit;
+			wp_send_json_success( array( 'found' => $found, 'next_offset' => $next_offset ) );
+		}
+
 	}
 
 	/**

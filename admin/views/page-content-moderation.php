@@ -453,193 +453,133 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 			⚠️ <?php esc_html_e( 'Karena memindai seluruh basis data, proses ini mungkin membutuhkan waktu cukup lama bergantung pada besarnya size database. Jendela browser jangan ditutup hingga pemindaian selesai.', 'meowpack' ); ?>
 		</p>
 
-		<button type="button" id="btn-start-scan" class="button button-primary button-large" style="margin-top:16px;">
-			🚀 <?php esc_html_e( 'Mulai Scan Seluruh Database', 'meowpack' ); ?>
-		</button>
-		
-		<div id="scan-progress-wrap" style="display:none; margin-top:24px; padding:20px; background:#1e1e2e; border-radius:8px; border:1px solid #313244;">
-			<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-				<div style="font-weight:600; font-size:1.1em;" id="scan-status">⏳ <?php esc_html_e( 'Menyiapkan tabel...', 'meowpack' ); ?></div>
-				<div id="scan-table-counter" style="color:#a6e3a1; font-weight:700;"></div>
-			</div>
-			<div style="width:100%; height:16px; background:#11111b; border-radius:8px; overflow:hidden;">
-				<div id="scan-bar" style="width:0; height:100%; background:linear-gradient(90deg, #89b4fa, #cba6f7); transition:width 0.3s ease;"></div>
-			</div>
-		</div>
-	</div>
+		<?php
+		// Fallback PHP-only scanner
+		$scan_results = array();
+		$scan_completed = false;
 
-	<!-- Tabel Hasil -->
-	<div class="meowpack-card" id="scan-results-card" style="display:none;">
-		<h3>⚠️ <?php esc_html_e( 'Hasil Pemindaian', 'meowpack' ); ?></h3>
-		<p class="description" id="scan-results-desc"></p>
-		<table class="widefat striped meowpack-table" id="scan-results-table">
-			<thead>
-				<tr>
-					<th><?php esc_html_e( 'Nama Tabel', 'meowpack' ); ?></th>
-					<th><?php esc_html_e( 'Identitas Baris (Primary Key)', 'meowpack' ); ?></th>
-					<th><?php esc_html_e( 'Kata Kunci', 'meowpack' ); ?></th>
-					<th><?php esc_html_e( 'Aksi / Lacak', 'meowpack' ); ?></th>
-				</tr>
-			</thead>
-			<tbody></tbody>
-		</table>
-	</div>
-
-	<script>
-	jQuery(document).ready(function($) {
-		let tablesToScan = [];
-		let currentTableIndex = 0;
-		let currentOffset = 0;
-		let foundItems = [];
-		let isRunning = false;
-
-		$('#btn-start-scan').on('click', function() {
-			if (isRunning) return;
-
-			if (!confirm('Apakah Anda yakin ingin memulai pemindaian penuh database? Ini mungkin memakan waktu lama.')) {
-				return;
+		if ( isset( $_POST['meowpack_run_full_scan'] ) && check_admin_referer( 'meowpack_full_scan_action' ) ) {
+			// Increase time limit for local scan
+			if ( function_exists( 'set_time_limit' ) ) {
+				@set_time_limit( 300 );
 			}
 
-			isRunning = true;
-			currentTableIndex = 0;
-			currentOffset = 0;
-			foundItems = [];
-			tablesToScan = [];
-
-			$(this).prop('disabled', true);
-			$('#scan-progress-wrap').show();
-			$('#scan-results-card').hide();
-			$('#scan-results-table tbody').empty();
-			updateProgress(0, 'Mendapatkan daftar tabel database...');
+			global $wpdb;
+			$tables = $wpdb->get_col( "SHOW TABLES" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			
-			// Step 1: Get all tables.
-			$.ajax({
-				url: ajaxurl,
-				type: 'POST',
-				dataType: 'json',
-				data: {
-					action: 'meowpack_manual_scan',
-					nonce: '<?php echo esc_js( wp_create_nonce( 'meowpack_manual_scan' ) ); ?>',
-					mode: 'get_tables'
-				},
-				success: function(res) {
-					if (res.success && res.data.tables && res.data.tables.length > 0) {
-						tablesToScan = res.data.tables;
-						doScanTableBatch();
-					} else {
-						updateProgress(100, '❌ Gagal mendapatkan daftar tabel.');
-						alert('Gagal mengambil struktur tabel.');
-						finishScan();
+			$moderator = new MeowPack_Content_Moderation();
+
+			foreach ( $tables as $table ) {
+				// Find text-based columns
+				$columns = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}`" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$text_columns = array();
+				$primary_key  = '';
+
+				foreach ( $columns as $col ) {
+					if ( 'PRI' === $col->Key && ! $primary_key ) {
+						$primary_key = $col->Field;
 					}
-				},
-				error: function() {
-					updateProgress(100, '❌ Koneksi terputus.');
-					finishScan();
-				}
-			});
-		});
-
-		function doScanTableBatch() {
-			if (currentTableIndex >= tablesToScan.length) {
-				finishScan();
-				return;
-			}
-
-			let tableName = tablesToScan[currentTableIndex];
-			let percent = (currentTableIndex / tablesToScan.length) * 100;
-			updateProgress(percent, `Memindai tabel: <strong>${tableName}</strong> (offset: ${currentOffset})...`);
-			$('#scan-table-counter').text(`${currentTableIndex + 1} / ${tablesToScan.length} Tabel`);
-
-			$.ajax({
-				url: ajaxurl,
-				type: 'POST',
-				dataType: 'json',
-				data: {
-					action: 'meowpack_manual_scan',
-					nonce: '<?php echo esc_js( wp_create_nonce( 'meowpack_manual_scan' ) ); ?>',
-					mode: 'scan_table',
-					table: tableName,
-					offset: currentOffset
-				},
-				success: function(res) {
-					if (res.success && res.data) {
-						if (res.data.found && res.data.found.length > 0) {
-							foundItems = foundItems.concat(res.data.found);
-							renderFoundItems(res.data.found);
-						}
-
-						if (res.data.next_offset !== null) {
-							// Continue same table at next offset
-							currentOffset = res.data.next_offset;
-							doScanTableBatch();
-						} else {
-							// Done with this table, move to next
-							currentTableIndex++;
-							currentOffset = 0;
-							doScanTableBatch();
-						}
-					} else {
-						// Error in response, skip table to prevent infinite blockage
-						console.error("Gagal memindai tabel: " + tableName, res);
-						currentTableIndex++;
-						currentOffset = 0;
-						doScanTableBatch();
+					$type = strtolower( $col->Type );
+					if ( strpos( $type, 'char' ) !== false || strpos( $type, 'text' ) !== false ) {
+						$text_columns[] = $col->Field;
 					}
-				},
-				error: function() {
-					// Network error, skip table and wait briefly
-					console.error("Koneksi terputus pada tabel: " + tableName);
-					currentTableIndex++;
-					currentOffset = 0;
-					setTimeout(doScanTableBatch, 2000); // retry next in 2s
-				}
-			});
-		}
-
-		function renderFoundItems(items) {
-			$('#scan-results-card').show();
-			let tbody = $('#scan-results-table tbody');
-			
-			items.forEach(function(item) {
-				let actionLink = '#';
-				if (item.link !== '#') {
-					actionLink = `<a href="${item.link}" target="_blank" class="button button-small">${item.linkLabel}</a>`;
-				} else {
-					actionLink = `<span style="color:#6c7086;font-size:0.85em;">Cek manual via phpMyAdmin</span>`;
 				}
 
-				let html = `<tr>
-					<td><span class="meowpack-badge" style="background:#313244;">${item.type}</span></td>
-					<td style="font-family:monospace; color:#cdd6f4;">${item.title}</td>
-					<td><code style="background:#f38ba8;color:#1e1e2e;padding:2px 6px;border-radius:4px;">${item.keyword}</code> <small style="color:#6c7086">(${item.category})</small></td>
-					<td>${actionLink}</td>
-				</tr>`;
-				tbody.append(html);
-			});
-		}
+				if ( empty( $text_columns ) ) {
+					continue;
+				}
 
-		function finishScan() {
-			isRunning = false;
-			$('#btn-start-scan').prop('disabled', false);
-			
-			if (tablesToScan.length > 0) {
-				$('#scan-table-counter').text(`${tablesToScan.length} / ${tablesToScan.length} Selesai`);
-				updateProgress(100, `✅ Pemindaian database selesai! Menemukan ${foundItems.length} potensi ancaman.`);
+				// Get all rows
+				$select_cols = $text_columns;
+				if ( $primary_key && ! in_array( $primary_key, $select_cols, true ) ) {
+					$select_cols[] = $primary_key;
+				}
 				
-				if (foundItems.length === 0) {
-					$('#scan-results-card').show();
-					$('#scan-results-desc').html('<span style="color:#a6e3a1; font-weight:600;">🎉 Sempurna! Seluruh database WordPress terbebas dari kata kunci berbahaya.</span>');
-				} else {
-					$('#scan-results-desc').html(`Ditemukan pada lokasi anomali. Pertimbangkan untuk mengeceknya melalui dashboard atau Database Manager / phpMyAdmin.`);
+				$cols_str = '`' . implode( '`, `', $select_cols ) . '`';
+				$rows = $wpdb->get_results( "SELECT {$cols_str} FROM `{$table}`" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+				if ( ! empty( $rows ) ) {
+					foreach ( $rows as $row ) {
+						$row_text = '';
+						foreach ( $text_columns as $col ) {
+							$row_text .= $row->$col . ' ';
+						}
+
+						$match = $moderator->scan_text( $row_text );
+						if ( $match ) {
+							$pk_val = $primary_key ? $row->$primary_key : 'N/A';
+							
+							$link = '#';
+							$link_label = __( 'Cek Manual', 'meowpack' );
+							if ( $table === $wpdb->posts ) {
+								$link = get_edit_post_link( $row->$primary_key, 'raw' );
+								$link_label = __( 'Edit Post', 'meowpack' );
+							} elseif ( $table === $wpdb->comments ) {
+								$link = get_edit_comment_link( $row->$primary_key );
+								$link_label = __( 'Edit Komentar', 'meowpack' );
+							}
+
+							$scan_results[] = array(
+								'type'      => $table,
+								'title'     => $primary_key . ': ' . $pk_val,
+								'keyword'   => $match['keyword'],
+								'category'  => $match['category'],
+								'link'      => $link ?: '#',
+								'linkLabel' => $link_label,
+							);
+						}
+					}
 				}
 			}
+			$scan_completed = true;
 		}
+		?>
 
-		function updateProgress(percent, text) {
-			$('#scan-bar').css('width', percent + '%');
-			$('#scan-status').html(text);
-		}
-	</script>
+		<form method="post" action="">
+			<?php wp_nonce_field( 'meowpack_full_scan_action' ); ?>
+			<input type="hidden" name="meowpack_run_full_scan" value="1" />
+			<button type="submit" class="button button-primary button-large" style="margin-top:16px;" onclick="return confirm('<?php esc_attr_e( 'Mulai pemindaian? Proses ini akan memakan waktu bergantung pada ukuran database.', 'meowpack' ); ?>');">
+				🚀 <?php esc_html_e( 'Mulai Scan Seluruh Database', 'meowpack' ); ?>
+			</button>
+		</form>
+
+		<?php if ( $scan_completed ) : ?>
+			<div class="meowpack-card" style="margin-top:24px;">
+				<h3 style="color:#a6e3a1;">✅ <?php esc_html_e( 'Pemindaian Selesai', 'meowpack' ); ?></h3>
+				<?php if ( empty( $scan_results ) ) : ?>
+					<p style="color:#22c55e; font-weight:600;">🎉 Sempurna! Seluruh database WordPress terbebas dari kata kunci berbahaya.</p>
+				<?php else : ?>
+					<p>⚠️ Ditemukan <strong><?php echo count( $scan_results ); ?></strong> ancaman.</p>
+					<table class="widefat striped meowpack-table">
+						<thead>
+							<tr>
+								<th><?php esc_html_e( 'Nama Tabel', 'meowpack' ); ?></th>
+								<th><?php esc_html_e( 'Identitas Baris', 'meowpack' ); ?></th>
+								<th><?php esc_html_e( 'Kata Kunci', 'meowpack' ); ?></th>
+								<th><?php esc_html_e( 'Aksi / Lacak', 'meowpack' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $scan_results as $item ) : ?>
+							<tr>
+								<td><span class="meowpack-badge" style="background:#f1f5f9; color:#475569;"><?php echo esc_html( $item['type'] ); ?></span></td>
+								<td style="font-family:monospace; color:#334155;"><?php echo esc_html( $item['title'] ); ?></td>
+								<td><code style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;"><?php echo esc_html( $item['keyword'] ); ?></code> <small style="color:#6c7086">(<?php echo esc_html( $item['category'] ); ?>)</small></td>
+								<td>
+									<?php if ( $item['link'] !== '#' ) : ?>
+										<a href="<?php echo esc_url( $item['link'] ); ?>" target="_blank" class="button button-small"><?php echo esc_html( $item['linkLabel'] ); ?></a>
+									<?php else : ?>
+										<span style="color:#6c7086;font-size:0.85em;">Cek manual via phpMyAdmin</span>
+									<?php endif; ?>
+								</td>
+							</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+	</div>
 	<?php elseif ( 'cloud' === $tab ) : ?>
 	<!-- =====================================================================
 	     TAB: CLOUD SYNC
