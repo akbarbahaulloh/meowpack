@@ -130,7 +130,7 @@ class MeowPack_Shortcodes {
 			$html .= sprintf(
 				'<li class="meowpack-post-list__item">
 					<a href="%s" class="meowpack-post-list__link">
-						<span class="meowpack-post-list__bullet">👉</span>
+						<span class="meowpack-post-list__bullet">•</span>
 						<span class="meowpack-post-list__title">%s</span>
 					</a>
 				</li>',

@@ -266,7 +266,7 @@ class MeowPack_Popular_Widget extends WP_Widget {
 				}
 				echo '<li class="meowpack-post-list__item">';
 				echo '<a href="' . esc_url( get_permalink( $post->ID ) ) . '" class="meowpack-post-list__link">';
-				echo '<span class="meowpack-post-list__bullet">🔥</span>';
+				echo '<span class="meowpack-post-list__bullet">•</span>';
 				echo '<span class="meowpack-post-list__title">' . esc_html( $post->post_title ) . '</span>';
 				echo '</a>';
 				echo '</li>';
@@ -341,7 +341,7 @@ class MeowPack_Random_Widget extends WP_Widget {
 				$query->the_post();
 				echo '<li class="meowpack-post-list__item">';
 				echo '<a href="' . esc_url( get_permalink() ) . '" class="meowpack-post-list__link">';
-				echo '<span class="meowpack-post-list__bullet">🎲</span>';
+				echo '<span class="meowpack-post-list__bullet">•</span>';
 				echo '<span class="meowpack-post-list__title">' . get_the_title() . '</span>';
 				echo '</a>';
 				echo '</li>';
@@ -414,7 +414,7 @@ class MeowPack_Recent_Widget extends WP_Widget {
 				$query->the_post();
 				echo '<li class="meowpack-post-list__item">';
 				echo '<a href="' . esc_url( get_permalink() ) . '" class="meowpack-post-list__link">';
-				echo '<span class="meowpack-post-list__bullet">✨</span>';
+				echo '<span class="meowpack-post-list__bullet">•</span>';
 				echo '<span class="meowpack-post-list__title">' . get_the_title() . '</span>';
 				echo '</a>';
 				echo '</li>';
