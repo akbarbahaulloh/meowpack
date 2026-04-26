@@ -112,10 +112,11 @@ class MeowPack_Reading_Time {
 	 * @return WP_REST_Response
 	 */
 	public function handle_engagement_request( WP_REST_Request $request ) {
-		$nonce = $request->get_param( 'nonce' );
-		if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
-			return new WP_REST_Response( array( 'ok' => false ), 200 );
-		}
+		// Bypassed for LiteSpeed Cache compatibility
+		// $nonce = $request->get_param( 'nonce' );
+		// if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
+		// 	return new WP_REST_Response( array( 'ok' => false ), 200 );
+		// }
 
 		$post_id      = absint( $request->get_param( 'post_id' ) );
 		$time_on_page = absint( $request->get_param( 'time_on_page' ) ); // seconds

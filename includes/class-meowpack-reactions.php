@@ -125,9 +125,10 @@ class MeowPack_Reactions {
 		$reaction = $request->get_param( 'reaction' );
 		$nonce    = $request->get_param( 'nonce' );
 
-		if ( ! wp_verify_nonce( $nonce, 'meowpack_tracker' ) ) {
-			return new WP_Error( 'invalid_nonce', 'Sesi kedaluwarsa. Silakan refresh halaman.', array( 'status' => 403 ) );
-		}
+		// Bypassed for LiteSpeed Cache compatibility
+		// if ( ! wp_verify_nonce( $nonce, 'meowpack_tracker' ) ) {
+		// 	return new WP_Error( 'invalid_nonce', 'Sesi kedaluwarsa. Silakan refresh halaman.', array( 'status' => 403 ) );
+		// }
 
 		global $wpdb;
 		$table   = $wpdb->prefix . 'meow_reactions';

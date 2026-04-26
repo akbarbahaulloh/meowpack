@@ -88,10 +88,11 @@ class MeowPack_Tracker {
 	 */
 	public function handle_track_request( WP_REST_Request $request ) {
 		// Validate nonce.
-		$nonce = $request->get_param( 'nonce' );
-		if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
-			return new WP_REST_Response( array( 'ok' => false ), 200 );
-		}
+		// Bypassed for LiteSpeed Cache compatibility
+		// $nonce = $request->get_param( 'nonce' );
+		// if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
+		// 	return new WP_REST_Response( array( 'ok' => false ), 200 );
+		// }
 
 		$post_id      = absint( $request->get_param( 'post_id' ) );
 		$referrer     = esc_url_raw( $request->get_param( 'referrer' ) ?? '' );
