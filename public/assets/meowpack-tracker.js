@@ -37,15 +37,13 @@
 			jQuery.post(data.ajax_url, payload).fail(function () { /* silent fail */ });
 		} else if (window.fetch) {
 			// Fallback to fetch if jQuery not available.
-			var formData = new FormData();
-			for (var key in payload) {
-				if (payload.hasOwnProperty(key)) {
-					formData.append(key, payload[key]);
-				}
-			}
+			var urlEncodedData = new URLSearchParams(payload).toString();
 			fetch(data.ajax_url, {
 				method:    'POST',
-				body:      formData,
+				headers:   {
+					'Content-Type': 'application/x-www-form-urlencoded'
+				},
+				body:      urlEncodedData,
 				keepalive: true,
 			}).catch(function () { /* silent fail */ });
 		}

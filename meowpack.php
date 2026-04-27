@@ -5,7 +5,7 @@
  * Description: The ultimate security and optimization powerhouse for WordPress. Real-time local stats, AI-powered protection, malware scanning, and instant social engine — privacy-first, zero cloud dependencies, 100% control.
  * Version:     2.4.1
  * Author:      Akbar Bahaulloh
- * Author URI:  https://akbarbahaulloh.id
+ * Author URI:  https://www.puskomedia.id
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: meowpack
