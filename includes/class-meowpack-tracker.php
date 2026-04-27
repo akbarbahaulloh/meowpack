@@ -186,6 +186,11 @@ class MeowPack_Tracker {
 		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
 		$ip     = MeowPack_Bot_Filter::get_client_ip();
 		$is_bot = MeowPack_Bot_Filter::is_bot( $ua, $ip ) ? 1 : 0;
+		
+		// Skip bot tracking if setting is on.
+		if ( '1' === MeowPack_Database::get_setting( 'exclude_bots', '1' ) && $is_bot ) {
+			return new WP_REST_Response( array( 'ok' => true, 'reason' => 'bot_filtered' ), 200 );
+		}
 
 		// Detect AI bot name for flagged visits.
 		$bot_info = MeowPack_AI_Bot_Manager::detect_from_ua( $ua );
@@ -206,8 +211,6 @@ class MeowPack_Tracker {
 		// Author of the post.
 		$post      = get_post( $post_id );
 		$author_id = $post ? (int) $post->post_author : 0;
-
-
 
 		// Step 2: Record detailed visit to wp_meow_visits (for analytics).
 		$this->record_visit( array(
@@ -278,202 +281,7 @@ class MeowPack_Tracker {
 	}
 
 	/**
-	 * Insert a visit record into the database (for detailed analytics).
-	 *
-	 * @param array $data Visit data.
-	 */
-	private function record_visit( array $data ) {
-		global $wpdb;
-		$table = $wpdb->prefix . 'meow_visits';
-
-		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$table,
-			array(
-				'post_id'      => $data['post_id'],
-				'author_id'    => $data['author_id'],
-				'visit_date'   => $data['visit_date'],
-				'visit_hour'   => $data['visit_hour'],
-				'ip_hash'      => $data['ip_hash'],
-				'source_type'  => $data['source_type'],
-				'source_name'  => $data['source_name'],
-				'utm_source'   => $data['utm_source'],
-				'utm_medium'   => $data['utm_medium'],
-				'utm_campaign' => $data['utm_campaign'],
-				'country_code' => $data['country_code'],
-				'region'       => $data['region'],
-				'city'         => $data['city'],
-				'device_type'  => $data['device_type'],
-				'browser'      => $data['browser'],
-				'os'           => $data['os'],
-				'is_bot'       => $data['is_bot'],
-				'bot_name'     => $data['bot_name'],
-				'created_at'   => current_time( 'mysql' ),
-			),
-			array(
-				'%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s',
-				'%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s',
-			)
-		);
-	}
-
-	/**
-	 * Geo-locate an IP address.
-	 * 1. Checks for local MaxMind GeoLite2-City.mmdb in includes/data/geoip/
-	 * 2. Falls back to ip-api.com (free API).
-	 *
-	 * @param string $ip IP address.
-	 * @return array{ country_code: string, region: string, city: string }
-	 */
-	private function get_geo_data( $ip ) {
-		$empty = array( 'country_code' => '', 'region' => '', 'city' => '' );
-
-		// Skip private/local IPs.
-		if ( ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
-			return $empty;
-		}
-
-		$cache_key = 'meowpack_geo_' . md5( $ip );
-		$cached    = get_transient( $cache_key );
-		if ( false !== $cached ) {
-			'source_type'  => $source['source_type'],
-			'source_name'  => $source['source_name'],
-			'utm_source'   => $utm_source,
-			'utm_medium'   => $utm_medium,
-			'utm_campaign' => $utm_campaign,
-			'country_code' => $geo['country_code'],
-			'region'       => $geo['region'],
-			'city'         => $geo['city'],
-			'device_type'  => $device_info['device'],
-			'browser'      => $device_info['browser'],
-			'os'           => $device_info['os'],
-			'is_bot'       => $is_bot,
-			'bot_name'     => $bot_name,
-		) );
-
-		wp_die( 'ok' );
-	}
-
-	/**
-	 * Handle incoming tracking REST request (kept for backward compatibility).
-	 *
-	 * @param WP_REST_Request $request REST request object.
-	 * @return WP_REST_Response
-	 */
-	public function handle_track_request( WP_REST_Request $request ) {
-		// Validate nonce.
-		// Bypassed for LiteSpeed Cache compatibility
-		// $nonce = $request->get_param( 'nonce' );
-		// if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
-		// 	return new WP_REST_Response( array( 'ok' => false ), 200 );
-		// }
-
-		$post_id      = absint( $request->get_param( 'post_id' ) );
-		$referrer     = esc_url_raw( $request->get_param( 'referrer' ) ?? '' );
-		$utm_source   = sanitize_text_field( $request->get_param( 'utm_source' ) ?? '' );
-		$utm_medium   = sanitize_text_field( $request->get_param( 'utm_medium' ) ?? '' );
-		$utm_campaign = sanitize_text_field( $request->get_param( 'utm_campaign' ) ?? '' );
-
-		if ( ! $post_id || ! get_post( $post_id ) ) {
-			return new WP_REST_Response( array( 'ok' => false, 'reason' => 'invalid_post' ), 200 );
-		}
-
-		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
-		$ip     = MeowPack_Bot_Filter::get_client_ip();
-		$is_bot = MeowPack_Bot_Filter::is_bot( $ua, $ip ) ? 1 : 0;
-
-		// Detect AI bot name for flagged visits.
-		$bot_info = MeowPack_AI_Bot_Manager::detect_from_ua( $ua );
-		$bot_name = $bot_info['bot_name'];
-
-		// Parse traffic source.
-		$source = MeowPack_Bot_Filter::parse_source( $referrer, $utm_source, $utm_medium );
-
-		// Hash IP for privacy.
-		$ip_hash = MeowPack_Bot_Filter::hash_ip( $ip );
-
-		// Detect device / browser / OS.
-		$device_info = MeowPack_Device_Detector::parse( $ua );
-
-		// Geo-location (country + region + city).
-		$geo = $this->get_geo_data( $ip );
-
-		// Author of the post.
-		$post      = get_post( $post_id );
-		$author_id = $post ? (int) $post->post_author : 0;
-
-		// Step 1: Direct UPDATE to wp_meow_post_views (simple counter).
-		$this->update_post_views( $post_id );
-
-		// Step 2: Record detailed visit to wp_meow_visits (for analytics).
-		$this->record_visit( array(
-			'post_id'      => $post_id,
-			'author_id'    => $author_id,
-			'visit_date'   => current_time( 'Y-m-d' ),
-			'visit_hour'   => (int) current_time( 'G' ),
-			'ip_hash'      => $ip_hash,
-			'source_type'  => $source['source_type'],
-			'source_name'  => $source['source_name'],
-			'utm_source'   => $utm_source,
-			'utm_medium'   => $utm_medium,
-			'utm_campaign' => $utm_campaign,
-			'country_code' => $geo['country_code'],
-			'region'       => $geo['region'],
-			'city'         => $geo['city'],
-			'device_type'  => $device_info['device'],
-			'browser'      => $device_info['browser'],
-			'os'           => $device_info['os'],
-			'is_bot'       => $is_bot,
-			'bot_name'     => $bot_name,
-		) );
-
-		return new WP_REST_Response( array( 'ok' => true ), 200 );
-	}
-
-	/**
-	 * Direct UPDATE to wp_meow_post_views table (simple counter).
-	 * This is the key to real-time display without timing issues.
-	 *
-	 * @param int $post_id Post ID.
-	 */
-	private function update_post_views( $post_id ) {
-		global $wpdb;
-		$table = $wpdb->prefix . 'meow_post_views';
-		$today = current_time( 'Y-m-d' );
-
-		// Try to update existing row for today.
-		$updated = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->prepare(
-				"UPDATE {$table} SET total_views = total_views + 1, daily_views = daily_views + 1 WHERE post_id = %d AND view_date = %s",
-				$post_id,
-				$today
-			)
-		);
-
-		// If no row was updated, insert a new one.
-		if ( 0 === $updated ) {
-			// Calculate carried-over total views from the previous day's row.
-			$prev_total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				$wpdb->prepare(
-					"SELECT total_views FROM {$table} WHERE post_id = %d ORDER BY view_date DESC LIMIT 1",
-					$post_id
-				)
-			);
-
-			$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				$table,
-				array(
-					'post_id'     => $post_id,
-					'total_views' => $prev_total + 1,
-					'daily_views' => 1,
-					'view_date'   => $today,
-				),
-				array( '%d', '%d', '%d', '%s' )
-			);
-		}
-	}
-
-	/**
-	 * Insert a visit record into the database (for detailed analytics).
+	 * Insert a visit record into the database.
 	 *
 	 * @param array $data Visit data.
 	 */
@@ -571,9 +379,9 @@ class MeowPack_Tracker {
 			if ( ! empty( $body['city'] ) ) {
 				$result['city'] = sanitize_text_field( $body['city'] );
 			}
-			set_transient( $cache_key, $result, MONTH_IN_SECONDS );
 		}
 
+		set_transient( $cache_key, $result, DAY_IN_SECONDS );
 		return $result;
 	}
 }
