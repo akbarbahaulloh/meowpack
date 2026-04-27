@@ -496,9 +496,19 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 				}
 				
 				$cols_str = '`' . implode( '`, `', $select_cols ) . '`';
-				$rows = $wpdb->get_results( "SELECT {$cols_str} FROM `{$table}`" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				
+				// Process in chunks to prevent memory exhaustion and "Commands out of sync" DB errors.
+				$limit  = 500;
+				$offset = 0;
 
-				if ( ! empty( $rows ) ) {
+				while ( true ) {
+					$query = "SELECT {$cols_str} FROM `{$table}` LIMIT {$limit} OFFSET {$offset}";
+					$rows  = $wpdb->get_results( $query ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+					if ( empty( $rows ) ) {
+						break; // No more rows in this table.
+					}
+
 					foreach ( $rows as $row ) {
 						$row_text = '';
 						foreach ( $text_columns as $col ) {
@@ -528,6 +538,16 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 								'linkLabel' => $link_label,
 							);
 						}
+					}
+					
+					$offset += $limit;
+					
+					// Free memory aggressively.
+					unset( $rows );
+					
+					// Safety limit to avoid infinite loops or extreme timeouts on massive tables
+					if ( $offset > 500000 ) {
+						break;
 					}
 				}
 			}
