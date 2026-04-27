@@ -219,14 +219,13 @@ class MeowPack_Stats {
 				break;
 		}
 
-		// Combined where: date in period AND date > last_agg_date.
+		$date_filter = ( 'today' === $period ) ? '' : $wpdb->prepare( ' AND visit_date > %s', $last_agg_date );
+		
+		// Combined where: date in period AND date > last_agg_date (except for 'today').
 		$row_raw = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(*) AS total_views
-				 FROM {$visits_table}
-				 WHERE is_bot = 0 AND {$where_raw_period} AND visit_date > %s",
-				$last_agg_date
-			),
+			"SELECT COUNT(DISTINCT ip_hash) AS unique_visitors, COUNT(*) AS total_views
+			 FROM {$visits_table}
+			 WHERE is_bot = 0 AND {$where_raw_period}{$date_filter}",
 			ARRAY_A
 		);
 
@@ -235,7 +234,7 @@ class MeowPack_Stats {
 			'total_views'     => (int) ( $row_agg['total_views'] ?? 0 ) + (int) ( $row_raw['total_views'] ?? 0 ),
 		);
 
-		$ttl = ( 'today' === $period ) ? 60 : 300;
+		$ttl = ( 'today' === $period ) ? 1 : 300;
 		set_transient( $cache_key, $result, $ttl );
 
 		return $result;
@@ -373,15 +372,14 @@ class MeowPack_Stats {
 		// Smart-Merge: Avoid double counting based on last aggregation date.
 		$last_agg_date = $wpdb->get_var( "SELECT MAX(stat_date) FROM {$stats_table}" ) ?: '0000-00-00';
 
+		$date_filter = ( 'today' === $period ) ? '' : $wpdb->prepare( ' AND visit_date > %s', $last_agg_date );
+		
 		// Fetch raw views from today/current range (real-time - only for days NOT aggregated)
 		$raw_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->prepare(
-				"SELECT post_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS uv 
-				 FROM {$visits_table} 
-				 WHERE is_bot = 0 AND post_id > 0 AND {$where_today} AND visit_date > %s
-				 GROUP BY post_id",
-				$last_agg_date
-			),
+			"SELECT post_id, COUNT(*) AS views, COUNT(DISTINCT ip_hash) AS uv 
+			 FROM {$visits_table} 
+			 WHERE is_bot = 0 AND post_id > 0 AND {$where_today}{$date_filter}
+			 GROUP BY post_id",
 			ARRAY_A
 		);
 
