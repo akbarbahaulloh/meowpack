@@ -344,7 +344,7 @@ class MeowPack_Tracker {
 		$result = $empty;
 
 		// --- 1. Attempt Local MaxMind MMDB (if file exists) ---
-		$mmdb_path = MEOWPACK_PATH . 'includes/data/geoip/GeoLite2-City.mmdb';
+		$mmdb_path = MEOWPACK_DIR . 'includes/data/geoip/GeoLite2-City.mmdb';
 		if ( file_exists( $mmdb_path ) && class_exists( 'MeowPack_MMDB_Reader' ) ) {
 			try {
 				$reader = new MeowPack_MMDB_Reader( $mmdb_path );
