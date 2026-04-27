@@ -465,11 +465,31 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 			}
 
 			global $wpdb;
-			$tables = $wpdb->get_col( "SHOW TABLES" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			
+			$target_tables = array(
+				array(
+					'table' => $wpdb->posts,
+					'where' => "post_status NOT IN ('trash', 'auto-draft') AND post_type != 'revision'",
+				),
+				array(
+					'table' => $wpdb->comments,
+					'where' => "comment_approved NOT IN ('trash', 'spam')",
+				),
+				array(
+					'table' => $wpdb->terms,
+					'where' => "1=1",
+				),
+				array(
+					'table' => $wpdb->term_taxonomy,
+					'where' => "1=1",
+				),
+			);
 			
 			$moderator = new MeowPack_Content_Moderation();
 
-			foreach ( $tables as $table ) {
+			foreach ( $target_tables as $target ) {
+				$table = $target['table'];
+				$where = $target['where'];
 				// Find text-based columns
 				$columns = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}`" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 				$text_columns = array();
@@ -502,7 +522,7 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 				$offset = 0;
 
 				while ( true ) {
-					$query = "SELECT {$cols_str} FROM `{$table}` LIMIT {$limit} OFFSET {$offset}";
+					$query = "SELECT {$cols_str} FROM `{$table}` WHERE {$where} LIMIT {$limit} OFFSET {$offset}";
 					$rows  = $wpdb->get_results( $query ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
 					if ( empty( $rows ) ) {
@@ -527,6 +547,13 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 							} elseif ( $table === $wpdb->comments ) {
 								$link = get_edit_comment_link( $row->$primary_key );
 								$link_label = __( 'Edit Komentar', 'meowpack' );
+							} elseif ( $table === $wpdb->terms || $table === $wpdb->term_taxonomy ) {
+								$term_id = $row->$primary_key;
+								$term = get_term( $term_id );
+								if ( ! is_wp_error( $term ) && $term ) {
+									$link = get_edit_term_link( $term->term_id, $term->taxonomy );
+									$link_label = __( 'Edit Kategori/Tag', 'meowpack' );
+								}
 							}
 
 							$scan_results[] = array(
@@ -589,7 +616,7 @@ foreach ( MeowPack_Content_Moderation::get_all_rules() as $r ) {
 									<?php if ( $item['link'] !== '#' ) : ?>
 										<a href="<?php echo esc_url( $item['link'] ); ?>" target="_blank" class="button button-small"><?php echo esc_html( $item['linkLabel'] ); ?></a>
 									<?php else : ?>
-										<span style="color:#6c7086;font-size:0.85em;">Cek manual via phpMyAdmin</span>
+										<span style="color:#6c7086;font-size:0.85em;">Cek di menu Kategori / Tag</span>
 									<?php endif; ?>
 								</td>
 							</tr>
