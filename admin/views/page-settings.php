@@ -314,6 +314,13 @@ $s = function( $key, $default = '' ) {
 				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Menampilkan artikel yang paling banyak dibaca dalam 7 hari terakhir.', 'meowpack' ); ?></p>
 			</div>
 
+			<!-- Post Views (Per Article) -->
+			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+				<h3 style="margin-top:0;">👀 <?php esc_html_e( 'Views Artikel', 'meowpack' ); ?></h3>
+				<code>[meowpack_views]</code>
+				<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Menampilkan total views untuk artikel spesifik. Mengikuti opsi Format Teks Tampilan Views di atas.', 'meowpack' ); ?></p>
+			</div>
+
 			<!-- Visitor Counter -->
 			<div style="background:#fff; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
 				<h3 style="margin-top:0;">👁️ <?php esc_html_e( 'Statistik Pengunjung', 'meowpack' ); ?></h3>

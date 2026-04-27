@@ -258,11 +258,19 @@ class MeowPack_Tracker {
 
 		// If no row was updated, insert a new one.
 		if ( 0 === $updated ) {
+			// Calculate carried-over total views from the previous day's row.
+			$prev_total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				$wpdb->prepare(
+					"SELECT total_views FROM {$table} WHERE post_id = %d ORDER BY view_date DESC LIMIT 1",
+					$post_id
+				)
+			);
+
 			$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 				$table,
 				array(
 					'post_id'     => $post_id,
-					'total_views' => 1,
+					'total_views' => $prev_total + 1,
 					'daily_views' => 1,
 					'view_date'   => $today,
 				),

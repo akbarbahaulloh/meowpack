@@ -96,8 +96,7 @@ class MeowPack_Bot_Filter {
 	 */
 	public static function is_bot( $user_agent = null, $ip = null ) {
 		$ua = $user_agent ?? ( isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '' );
-		$ip = $ip ?? self::get_client_ip();
-
+		
 		// Empty or very short UA.
 		if ( strlen( $ua ) < 10 ) {
 			return true;
@@ -111,15 +110,8 @@ class MeowPack_Bot_Filter {
 			}
 		}
 
-		// No Accept-Language header (common for bots).
-		if ( empty( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) ) {
-			return true;
-		}
-
-		// IP rate limiting: > 30 requests/minute.
-		if ( self::is_rate_limited( $ip ) ) {
-			return true;
-		}
+		// Removed Accept-Language and IP rate limiting checks 
+		// because they can aggressively block real traffic on load balancers or certain fetch configurations.
 
 		return false;
 	}

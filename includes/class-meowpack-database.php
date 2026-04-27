@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class MeowPack_Database {
 
 	/** @var string Database schema version. */
-	const SCHEMA_VERSION = '2.4.0';
+	const SCHEMA_VERSION = '2.4.1';
 
 	/** @var string Option key for stored schema version. */
 	const SCHEMA_OPTION = 'meowpack_db_version';
