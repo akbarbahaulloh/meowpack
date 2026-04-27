@@ -126,10 +126,10 @@ class MeowPack_Core {
 	 * Register REST API routes.
 	 */
 	public function register_rest_routes() {
-		// --- Tracking endpoint -------------------------------------------------
+		// --- Tracking endpoint (Disguised as /search to bypass AdBlockers) ---
 		register_rest_route(
 			'meowpack/v1',
-			'/track',
+			'/search',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this->tracker, 'handle_track_request' ),

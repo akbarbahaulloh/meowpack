@@ -28,17 +28,14 @@ class MeowPack_Tracker {
 			return;
 		}
 
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_tracker' ) );
-		
-		// Register AJAX handlers for tracking (both logged in and not logged in).
-		add_action( 'wp_ajax_nopriv_meowpack_track', array( $this, 'handle_track_ajax' ) );
-		add_action( 'wp_ajax_meowpack_track', array( $this, 'handle_track_ajax' ) );
+		add_action( 'wp_footer', array( $this, 'inject_inline_tracker' ), 999 );
 	}
 
 	/**
-	 * Enqueue the tracker script only on singular posts/pages.
+	 * Inject the tracker script directly into the footer (inline).
+	 * This completely bypasses script optimization plugins and caching issues.
 	 */
-	public function enqueue_tracker() {
+	public function inject_inline_tracker() {
 		// Don't track admins if setting is on.
 		if ( '1' === MeowPack_Database::get_setting( 'exclude_admins', '1' ) && current_user_can( 'manage_options' ) ) {
 			return;
@@ -60,106 +57,107 @@ class MeowPack_Tracker {
 			return;
 		}
 
-		wp_enqueue_script(
-			'meowpack-tracker',
-			MEOWPACK_URL . 'public/assets/meowpack-tracker.js',
-			array(),
-			filemtime( MEOWPACK_DIR . 'public/assets/meowpack-tracker.js' ),
-			true // Load in footer.
+		$data = array(
+			'post_id'             => $post_id,
+			'search_url'          => rest_url( 'meowpack/v1/search' ),
+			'engagement_endpoint' => rest_url( 'meowpack/v1/engagement' ),
+			'click_endpoint'      => rest_url( 'meowpack/v1/click' ),
+			'nonce'               => wp_create_nonce( 'wp_rest' ), // Standard REST nonce
+			'site_host'           => wp_parse_url( home_url(), PHP_URL_HOST ),
+			'enable_clicks'       => MeowPack_Database::get_setting( 'enable_click_tracker', '1' ),
+			'enable_engagement'   => MeowPack_Database::get_setting( 'enable_reading_time', '1' ),
 		);
+		?>
+		<script id="meowpack-inline-tracker" data-cfasync="false">
+			// Do not change this comment line otherwise Speed Optimizer won't be able to detect this script
+			(function () {
+				var d = document;
+				var data = <?php echo wp_json_encode( $data ); ?>;
+				var pid = data.post_id;
+				if (!pid) return;
 
-		wp_localize_script(
-			'meowpack-tracker',
-			'meowpack_data',
-			array(
-				'post_id'             => $post_id,
-				'ajax_url'            => admin_url( 'admin-ajax.php' ),
-				'engagement_endpoint' => rest_url( 'meowpack/v1/engagement' ),
-				'click_endpoint'      => rest_url( 'meowpack/v1/click' ),
-				'nonce'               => wp_create_nonce( 'meowpack_track' ),
-				'site_host'           => wp_parse_url( home_url(), PHP_URL_HOST ),
-				'enable_clicks'       => MeowPack_Database::get_setting( 'enable_click_tracker', '1' ),
-				'enable_engagement'   => MeowPack_Database::get_setting( 'enable_reading_time', '1' ),
-			)
-		);
-	}
+				function sendRequest(url, body) {
+					if (!window.fetch) {
+						var xhr = new XMLHttpRequest();
+						xhr.open("POST", url, true);
+						xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+						xhr.setRequestHeader("X-WP-Nonce", data.nonce);
+						xhr.send(JSON.stringify(body));
+						return;
+					}
+					fetch(url, {
+						method: 'POST',
+						body: JSON.stringify(body),
+						keepalive: true,
+						headers: {
+							'Content-Type': 'application/json;charset=UTF-8',
+							'X-WP-Nonce': data.nonce
+						}
+					}).catch(function() {});
+				}
 
-	/**
-	 * Handle incoming tracking AJAX request.
-	 * This is the new approach: direct UPDATE to wp_meow_post_views table.
-	 *
-	 * @return void
-	 */
-	public function handle_track_ajax() {
-		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+				// Visit Tracking
+				var urlObj = new URL(location.href);
+				var payload = {
+					post_id: pid,
+					referrer: d.referrer || '',
+					utm_source: urlObj.searchParams.get('utm_source') || '',
+					utm_medium: urlObj.searchParams.get('utm_medium') || '',
+					utm_campaign: urlObj.searchParams.get('utm_campaign') || ''
+				};
+				
+				// Send main tracking request to disguised endpoint
+				sendRequest(data.search_url, payload);
 
-		if ( ! $post_id || ! get_post( $post_id ) ) {
-			wp_die( 'invalid_post' );
-		}
+				// Engagement Tracking
+				if (data.enable_engagement === '1' && data.engagement_endpoint) {
+					var activeTime = 0, maxScroll = 0, lastActivity = Date.now(), isActive = true, engagementSent = false;
+					function updateScrollDepth() {
+						var el = d.documentElement;
+						var total = el.scrollHeight - el.clientHeight;
+						if (total > 0) {
+							var pct = Math.round(((el.scrollTop || d.body.scrollTop) / total) * 100);
+							if (pct > maxScroll) maxScroll = pct;
+						}
+					}
+					function markActive() { lastActivity = Date.now(); isActive = true; }
+					d.addEventListener('scroll', updateScrollDepth, { passive: true });
+					['mousemove','keydown','touchstart'].forEach(function(e){ d.addEventListener(e, markActive, {passive: true}); });
+					updateScrollDepth();
+					
+					var ticker = setInterval(function() {
+						if (isActive && (Date.now() - lastActivity) < 30000) activeTime++;
+					}, 1000);
 
-		// Step 1: Direct UPDATE to wp_meow_post_views (simple counter).
-		// MOVED TO THE TOP: Ensures the basic view counter ALWAYS works instantly like Top 10,
-		// without waiting for any complex analytics parsing below.
-		$this->update_post_views( $post_id );
+					function sendEngagement() {
+						if (engagementSent) return;
+						engagementSent = true;
+						clearInterval(ticker);
+						var engPayload = { post_id: pid, time_on_page: Math.min(activeTime, 7200), scroll_depth: Math.min(maxScroll, 100) };
+						sendRequest(data.engagement_endpoint, engPayload);
+					}
+					d.addEventListener('visibilitychange', function () { if (d.visibilityState === 'hidden') sendEngagement(); });
+					window.addEventListener('pagehide', sendEngagement);
+				}
 
-		// Get tracking data.
-		$referrer     = isset( $_POST['referrer'] ) ? esc_url_raw( wp_unslash( $_POST['referrer'] ) ) : '';
-		$utm_source   = isset( $_POST['utm_source'] ) ? sanitize_text_field( wp_unslash( $_POST['utm_source'] ) ) : '';
-		$utm_medium   = isset( $_POST['utm_medium'] ) ? sanitize_text_field( wp_unslash( $_POST['utm_medium'] ) ) : '';
-		$utm_campaign = isset( $_POST['utm_campaign'] ) ? sanitize_text_field( wp_unslash( $_POST['utm_campaign'] ) ) : '';
-
-		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
-		$ip     = MeowPack_Bot_Filter::get_client_ip();
-		$is_bot = MeowPack_Bot_Filter::is_bot( $ua, $ip ) ? 1 : 0;
-
-		// Skip bot tracking if setting is on.
-		if ( '1' === MeowPack_Database::get_setting( 'exclude_bots', '1' ) && $is_bot ) {
-			wp_die( 'ok' );
-		}
-
-		// Detect AI bot name for flagged visits.
-		$bot_info = MeowPack_AI_Bot_Manager::detect_from_ua( $ua );
-		$bot_name = $bot_info['bot_name'];
-
-		// Parse traffic source.
-		$source = MeowPack_Bot_Filter::parse_source( $referrer, $utm_source, $utm_medium );
-
-		// Hash IP for privacy.
-		$ip_hash = MeowPack_Bot_Filter::hash_ip( $ip );
-
-		// Detect device / browser / OS.
-		$device_info = MeowPack_Device_Detector::parse( $ua );
-
-		// Geo-location (country + region + city) - Only uses local fast DB now.
-		$geo = $this->get_geo_data( $ip );
-
-		// Author of the post.
-		$post      = get_post( $post_id );
-		$author_id = $post ? (int) $post->post_author : 0;
-
-		// Step 2: Record detailed visit to wp_meow_visits (for analytics).
-		$this->record_visit( array(
-			'post_id'      => $post_id,
-			'author_id'    => $author_id,
-			'visit_date'   => current_time( 'Y-m-d' ),
-			'visit_hour'   => (int) current_time( 'G' ),
-			'ip_hash'      => $ip_hash,
-			'source_type'  => $source['source_type'],
-			'source_name'  => $source['source_name'],
-			'utm_source'   => $utm_source,
-			'utm_medium'   => $utm_medium,
-			'utm_campaign' => $utm_campaign,
-			'country_code' => $geo['country_code'],
-			'region'       => $geo['region'],
-			'city'         => $geo['city'],
-			'device_type'  => $device_info['device'],
-			'browser'      => $device_info['browser'],
-			'os'           => $device_info['os'],
-			'is_bot'       => $is_bot,
-			'bot_name'     => $bot_name,
-		) );
-
-		wp_die( 'ok' );
+				// Click Tracking
+				if (data.enable_clicks === '1' && data.click_endpoint && data.site_host) {
+					d.addEventListener('click', function (e) {
+						var t = e.target.closest('a[href]');
+						if (!t) return;
+						var h = t.getAttribute('href') || '';
+						if (!h || h.charAt(0) === '#' || h.indexOf('mailto:') === 0 || h.indexOf('tel:') === 0) return;
+						try { var l = new URL(h, location.href); } catch (err) { return; }
+						var sh = data.site_host.toLowerCase();
+						if (l.hostname.toLowerCase() === sh || l.hostname.toLowerCase().endsWith('.' + sh)) return;
+						
+						var clickPayload = { post_id: pid, url: l.href, anchor_text: (t.textContent || '').trim().substring(0, 120) };
+						sendRequest(data.click_endpoint, clickPayload);
+					}, { passive: true });
+				}
+			})();
+		</script>
+		<?php
 	}
 
 	/**
@@ -169,12 +167,8 @@ class MeowPack_Tracker {
 	 * @return WP_REST_Response
 	 */
 	public function handle_track_request( WP_REST_Request $request ) {
-		// Validate nonce.
-		// Bypassed for LiteSpeed Cache compatibility
-		// $nonce = $request->get_param( 'nonce' );
-		// if ( ! wp_verify_nonce( $nonce, 'meowpack_track' ) ) {
-		// 	return new WP_REST_Response( array( 'ok' => false ), 200 );
-		// }
+		// Validating REST Nonce helps against CSRF, but sometimes causes cache issues.
+		// Since this is a public analytics endpoint, we rely on bot filtering and rate limiting instead.
 
 		$post_id      = absint( $request->get_param( 'post_id' ) );
 		$referrer     = esc_url_raw( $request->get_param( 'referrer' ) ?? '' );
@@ -183,8 +177,11 @@ class MeowPack_Tracker {
 		$utm_campaign = sanitize_text_field( $request->get_param( 'utm_campaign' ) ?? '' );
 
 		if ( ! $post_id || ! get_post( $post_id ) ) {
-			return new WP_REST_Response( array( 'ok' => false, 'reason' => 'invalid_post' ), 200 );
+			return new WP_REST_Response( array( 'ok' => false, 'reason' => 'invalid_post' ), 400 );
 		}
+
+		// Step 1: Direct UPDATE to wp_meow_post_views (simple counter).
+		$this->update_post_views( $post_id );
 
 		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
 		$ip     = MeowPack_Bot_Filter::get_client_ip();
@@ -210,8 +207,7 @@ class MeowPack_Tracker {
 		$post      = get_post( $post_id );
 		$author_id = $post ? (int) $post->post_author : 0;
 
-		// Step 1: Direct UPDATE to wp_meow_post_views (simple counter).
-		$this->update_post_views( $post_id );
+
 
 		// Step 2: Record detailed visit to wp_meow_visits (for analytics).
 		$this->record_visit( array(
