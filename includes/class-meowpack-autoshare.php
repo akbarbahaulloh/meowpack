@@ -24,7 +24,7 @@ class MeowPack_AutoShare {
 	 * @var string[]
 	 */
 	public static $platforms = array(
-		'telegram', 'facebook', 'twitter', 'linkedin',
+		'telegram', 'facebook', 'instagram', 'twitter', 'linkedin',
 		'bluesky', 'threads', 'pinterest', 'line', 'whatsapp',
 	);
 
@@ -258,6 +258,21 @@ class MeowPack_AutoShare {
 	// -------------------------------------------------------------------------
 
 	/**
+	 * Public wrapper to test a platform connection.
+	 *
+	 * @param string $platform Platform slug.
+	 * @param array  $vars     Template variables.
+	 * @return array
+	 */
+	public function test_connection( $platform, $vars ) {
+		$method = 'share_' . $platform;
+		if ( method_exists( $this, $method ) ) {
+			return $this->$method( $vars );
+		}
+		return array( 'success' => false, 'code' => 404 );
+	}
+
+	/**
 	 * Share a post to the given platforms.
 	 *
 	 * @param int      $post_id   Post ID.
@@ -274,6 +289,11 @@ class MeowPack_AutoShare {
 		foreach ( $platforms as $platform ) {
 			$platform = sanitize_key( $platform );
 			if ( ! in_array( $platform, self::$platforms, true ) ) {
+				continue;
+			}
+
+			// Skip if already shared successfully.
+			if ( $this->is_already_shared( $post_id, $platform ) ) {
 				continue;
 			}
 
@@ -306,11 +326,13 @@ class MeowPack_AutoShare {
 		}
 
 		return array(
-			'{title}'    => get_the_title( $post ),
-			'{url}'      => get_permalink( $post ),
-			'{excerpt}'  => $excerpt,
-			'{tags}'     => $tags,
-			'{sitename}' => get_bloginfo( 'name' ),
+			'{id}'             => $post->ID,
+			'{title}'          => get_the_title( $post ),
+			'{url}'            => get_permalink( $post ),
+			'{excerpt}'        => $excerpt,
+			'{tags}'           => $tags,
+			'{sitename}'       => get_bloginfo( 'name' ),
+			'{featured_image}' => get_the_post_thumbnail_url( $post->ID, 'full' ),
 		);
 	}
 
@@ -439,7 +461,8 @@ class MeowPack_AutoShare {
 		}
 
 		$td = $token['token_data'];
-		if ( empty( $td['api_key'] ) || empty( $td['api_secret'] ) || empty( $td['access_token'] ) || empty( $td['access_secret'] ) ) {
+		// Twitter OAuth 1.0a requires 4 keys. access_token is the primary encrypted token.
+		if ( empty( $td['api_key'] ) || empty( $td['api_secret'] ) || empty( $token['access_token'] ) || empty( $td['access_secret'] ) ) {
 			return array( 'success' => false, 'code' => null );
 		}
 
@@ -454,7 +477,7 @@ class MeowPack_AutoShare {
 		$body   = wp_json_encode( array( 'text' => $text ) );
 		$oauth  = $this->build_oauth1_header(
 			$td['api_key'], $td['api_secret'],
-			$td['access_token'], $td['access_secret'],
+			$token['access_token'], $td['access_secret'],
 			'POST', $url, array()
 		);
 
@@ -765,6 +788,85 @@ class MeowPack_AutoShare {
 
 		$code = wp_remote_retrieve_response_code( $response );
 		return array( 'success' => ! is_wp_error( $response ) && 200 === (int) $code, 'code' => (int) $code );
+	}
+
+	/**
+	 * Check if a post has already been shared successfully to a platform.
+	 *
+	 * @param int    $post_id  Post ID.
+	 * @param string $platform Platform slug.
+	 * @return bool
+	 */
+	private function is_already_shared( $post_id, $platform ) {
+		global $wpdb;
+		$status = $wpdb->get_var( $wpdb->prepare(
+			"SELECT status FROM {$wpdb->prefix}meow_share_logs WHERE post_id = %d AND platform = %s AND status = 'success' LIMIT 1",
+			absint( $post_id ), sanitize_key( $platform )
+		) );
+		return 'success' === $status;
+	}
+
+	/**
+	 * Share to Instagram via Graph API (Business/Creator accounts).
+	 * Requires a featured image.
+	 *
+	 * @param array $vars Template vars.
+	 * @return array{ success: bool, code: int|null }
+	 */
+	private function share_instagram( array $vars ) {
+		$token = $this->get_token( 'instagram' );
+		if ( ! $token || empty( $token['access_token'] ) || empty( $token['token_data']['ig_user_id'] ) ) {
+			return array( 'success' => false, 'code' => null );
+		}
+
+		$image_url = $vars['{featured_image}'] ?? '';
+		if ( ! $image_url ) {
+			return array( 'success' => false, 'code' => 400 ); // No image.
+		}
+
+		$ig_user_id   = $token['token_data']['ig_user_id'];
+		$access_token = $token['access_token'];
+		$template     = $token['token_data']['message_template'] ?? "{title}\n\n{url}";
+		$caption      = $this->fill_template( $template, $vars );
+
+		// Step 1: Create media container.
+		$container_resp = wp_remote_post(
+			"https://graph.facebook.com/v19.0/{$ig_user_id}/media",
+			array(
+				'timeout' => 20,
+				'body'    => array(
+					'image_url'    => $image_url,
+					'caption'      => $caption,
+					'access_token' => $access_token,
+				),
+			)
+		);
+
+		if ( is_wp_error( $container_resp ) ) {
+			return array( 'success' => false, 'code' => null );
+		}
+
+		$container = json_decode( wp_remote_retrieve_body( $container_resp ), true );
+		$creation_id = $container['id'] ?? '';
+
+		if ( ! $creation_id ) {
+			return array( 'success' => false, 'code' => (int) wp_remote_retrieve_response_code( $container_resp ) );
+		}
+
+		// Step 2: Publish media.
+		$publish_resp = wp_remote_post(
+			"https://graph.facebook.com/v19.0/{$ig_user_id}/media_publish",
+			array(
+				'timeout' => 20,
+				'body'    => array(
+					'creation_id'  => $creation_id,
+					'access_token' => $access_token,
+				),
+			)
+		);
+
+		$code = wp_remote_retrieve_response_code( $publish_resp );
+		return array( 'success' => ! is_wp_error( $publish_resp ) && 200 === (int) $code, 'code' => (int) $code );
 	}
 
 	// -------------------------------------------------------------------------

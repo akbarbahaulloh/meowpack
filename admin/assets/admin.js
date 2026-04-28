@@ -272,6 +272,64 @@
 	}
 
 	// =========================================================
+	// Settings: Cron Mode Toggle
+	// =========================================================
+
+	function initCronModeToggle() {
+		var select = document.getElementById('meowpack_cron_mode');
+		var info = document.getElementById('meowpack_manual_cron_info');
+		if (!select || !info) return;
+
+		select.addEventListener('change', function () {
+			info.style.display = (this.value === 'manual') ? '' : 'none';
+		});
+	}
+
+	// =========================================================
+	// Auto Share: Test Connection
+	// =========================================================
+
+	function initTestShare() {
+		var buttons = document.querySelectorAll('.meowpack-btn-test-share');
+		if (!buttons.length) return;
+
+		buttons.forEach(function (btn) {
+			btn.addEventListener('click', function () {
+				var platform = this.dataset.platform;
+				var originalText = this.textContent;
+
+				this.disabled = true;
+				this.textContent = '⏳ Mengirim...';
+
+				var formData = new FormData();
+				formData.append('action', 'meowpack_test_share');
+				formData.append('platform', platform);
+				formData.append('nonce', meowpackAdmin.testNonce);
+
+				fetch(ajaxurl, {
+					method: 'POST',
+					body: formData
+				})
+				.then(function (r) { return r.json(); })
+				.then(function (data) {
+					btn.disabled = false;
+					btn.textContent = originalText;
+					if (data.success) {
+						alert(data.data.message);
+					} else {
+						alert(data.data.message + (data.data.code ? ' (Code: ' + data.data.code + ')' : ''));
+					}
+				})
+				.catch(function (err) {
+					btn.disabled = false;
+					btn.textContent = originalText;
+					alert('Terjadi kesalahan jaringan.');
+				});
+			});
+		});
+	}
+
+	// =========================================================
 	// Boot
 	// =========================================================
 
@@ -279,5 +337,7 @@
 		initDashboardCharts();
 		initSharePlatformCheckboxes();
 		initExportCsv();
+		initCronModeToggle();
+		initTestShare();
 	});
 })();

@@ -31,13 +31,22 @@ $platform_config = array(
 			'message_template' => array( 'label' => 'Template Pesan', 'type' => 'textarea', 'placeholder' => '{title} — {sitename}' ),
 		),
 	),
+	'instagram' => array(
+		'label'  => 'Instagram',
+		'icon'   => '📸',
+		'fields' => array(
+			'access_token'     => array( 'label' => 'Page Access Token', 'type' => 'password' ),
+			'ig_user_id'       => array( 'label' => 'Instagram Business ID', 'type' => 'text' ),
+			'message_template' => array( 'label' => 'Caption Template', 'type' => 'textarea', 'placeholder' => "{title}\n\n{url}" ),
+		),
+	),
 	'twitter' => array(
 		'label'  => 'X (Twitter)',
 		'icon'   => '🐦',
 		'fields' => array(
 			'api_key'          => array( 'label' => 'API Key (Consumer Key)', 'type' => 'password' ),
 			'api_secret'       => array( 'label' => 'API Secret', 'type' => 'password' ),
-			'access_token_key' => array( 'label' => 'Access Token', 'type' => 'password' ),
+			'access_token'     => array( 'label' => 'Access Token', 'type' => 'password' ),
 			'access_secret'    => array( 'label' => 'Access Token Secret', 'type' => 'password' ),
 			'message_template' => array( 'label' => 'Template Pesan (maks 280 karakter)', 'type' => 'textarea', 'placeholder' => '{title} {url}' ),
 		),
@@ -113,6 +122,18 @@ if ( ! array_key_exists( $active_tab, $platform_config ) ) {
 	</div>
 	<?php endif; ?>
 
+	<div class="notice notice-info" style="margin: 15px 0; padding: 12px 15px; border-left: 4px solid #2271b1;">
+		<p style="margin: 0 0 8px 0;">
+			<strong>📖 Butuh bantuan setup?</strong> 
+			Baca <a href="<?php echo esc_url( MEOWPACK_URL . 'PANDUAN-AUTOSHARE.md' ); ?>" target="_blank" style="font-weight: 600;">Panduan Lengkap Auto Share</a> 
+			untuk tutorial step-by-step setiap platform.
+		</p>
+		<p style="margin: 0; font-size: 13px;">
+			🚀 <a href="<?php echo esc_url( MEOWPACK_URL . 'QUICK-START-AUTOSHARE.md' ); ?>" target="_blank">Quick Start (5 menit)</a> | 
+			🔧 <a href="<?php echo esc_url( MEOWPACK_URL . 'TROUBLESHOOTING-AUTOSHARE.md' ); ?>" target="_blank">Troubleshooting</a>
+		</p>
+	</div>
+
 	<p class="meowpack-intro">
 		<?php esc_html_e( 'Konfigurasi token untuk setiap platform. Gunakan variabel {title}, {url}, {excerpt}, {tags}, {sitename} di template pesan.', 'meowpack' ); ?>
 	</p>
@@ -145,6 +166,12 @@ if ( ! array_key_exists( $active_tab, $platform_config ) ) {
 	?>
 	<div class="meowpack-platform-form">
 		<h2><?php echo esc_html( $config['icon'] . ' ' . $config['label'] ); ?></h2>
+
+		<?php if ( 'instagram' === $active_tab ) : ?>
+		<div class="notice notice-warning inline" style="margin-bottom: 20px;">
+			<p>⚠️ <strong>Penting:</strong> Instagram Graph API mewajibkan postingan memiliki <strong>Gambar Utama (Featured Image)</strong>. Jika tidak ada gambar, sistem akan melewati (skip) proses sharing untuk platform ini.</p>
+		</div>
+		<?php endif; ?>
 
 		<form method="post" action="">
 			<?php wp_nonce_field( 'meowpack_token_save', 'meowpack_token_nonce' ); ?>
@@ -187,7 +214,11 @@ if ( ! array_key_exists( $active_tab, $platform_config ) ) {
 				<button type="submit" class="button button-primary" id="meowpack-save-token-<?php echo esc_attr( $active_tab ); ?>">
 					<?php printf( esc_html__( 'Simpan %s', 'meowpack' ), esc_html( $config['label'] ) ); ?>
 				</button>
+
 				<?php if ( $token_row && ! empty( $token_row['access_token'] ) ) : ?>
+				<button type="button" class="button meowpack-btn-test-share" data-platform="<?php echo esc_attr( $active_tab ); ?>">
+					🚀 <?php esc_html_e( 'Kirim Pesan Tes', 'meowpack' ); ?>
+				</button>
 				<span class="meowpack-badge meowpack-badge--connected">✅ <?php esc_html_e( 'Terhubung', 'meowpack' ); ?></span>
 				<?php else : ?>
 				<span class="meowpack-badge meowpack-badge--notset">⚠️ <?php esc_html_e( 'Belum dikonfigurasi', 'meowpack' ); ?></span>

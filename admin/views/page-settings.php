@@ -339,6 +339,43 @@ $s = function( $key, $default = '' ) {
 
 	<hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
 
+		<!-- Cron Optimization -->
+		<div class="meowpack-settings-section">
+			<h2>⏰ <?php esc_html_e( 'Optimasi Cron (Scheduler)', 'meowpack' ); ?></h2>
+			<table class="form-table meowpack-form-table">
+				<tr>
+					<th><?php esc_html_e( 'Mode Cron', 'meowpack' ); ?></th>
+					<td>
+						<select name="cron_mode" id="meowpack_cron_mode">
+							<option value="wp-cron" <?php selected( $s( 'cron_mode', 'wp-cron' ), 'wp-cron' ); ?>><?php esc_html_e( 'WP-Cron (Bawaan WordPress)', 'meowpack' ); ?></option>
+							<option value="manual" <?php selected( $s( 'cron_mode', 'wp-cron' ), 'manual' ); ?>><?php esc_html_e( 'Server Cron (Manual/External)', 'meowpack' ); ?></option>
+						</select>
+						<p class="description"><?php esc_html_e( 'WP-Cron bergantung pada trafik pengunjung. Server Cron lebih stabil untuk Shared Hosting/VPS.', 'meowpack' ); ?></p>
+					</td>
+				</tr>
+				<tr id="meowpack_manual_cron_info" style="<?php echo 'manual' === $s( 'cron_mode', 'wp-cron' ) ? '' : 'display:none;'; ?>">
+					<th><?php esc_html_e( 'Instruksi Server Cron', 'meowpack' ); ?></th>
+					<td>
+						<p><?php esc_html_e( 'Gunakan URL ini di cPanel Cron Jobs atau Crontab Anda (rekomendasi: setiap 15 menit):', 'meowpack' ); ?></p>
+						<?php
+						$cron_url = rest_url( 'meowpack/v1/cron?token=' . $s( 'cron_secret_token' ) );
+						?>
+						<code style="display:block; padding:10px; background:#f1f5f9; border:1px solid #cbd5e1; margin:10px 0; word-break: break-all;"><?php echo esc_url( $cron_url ); ?></code>
+						<p class="description"><?php esc_html_e( 'Contoh Command:', 'meowpack' ); ?> <code>curl -s "<?php echo esc_url( $cron_url ); ?>" > /dev/null 2>&1</code></p>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Terakhir Berjalan', 'meowpack' ); ?></th>
+					<td>
+						<strong><?php echo esc_html( $s( 'last_cron_run', __( 'Belum pernah', 'meowpack' ) ) ); ?></strong>
+						<p class="description"><?php esc_html_e( 'Waktu terakhir sistem menjalankan tugas otomatis (retry share & agregasi).', 'meowpack' ); ?></p>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+	<hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
+
 	<!-- MeowSync Engine -->
 	<div class="meowpack-settings-section" id="meowpack-sync">
 		<h2>⚡ MeowSync Engine — Secure Copy/Paste</h2>
@@ -360,6 +397,29 @@ $s = function( $key, $default = '' ) {
 			<div style="flex:1;">
 				<h3>📤 Salin Config (Situs Ini)</h3>
 				<textarea readonly style="width:100%; height:120px; font-family:monospace; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:10px;" id="meow-sync-export-code" onclick="this.select()"><?php echo esc_textarea( MeowPack_Database::export_sync_data() ); ?></textarea>
+				<script>
+				// =========================================================
+				// Settings: Cron Mode Toggle
+				// =========================================================
+
+				function initCronModeToggle() {
+					var select = document.getElementById('meowpack_cron_mode');
+					var info = document.getElementById('meowpack_manual_cron_info');
+					if (!select || !info) return;
+
+					select.addEventListener('change', function () {
+						info.style.display = (this.value === 'manual') ? '' : 'none';
+					});
+				}
+
+				// =========================================================
+				// Boot
+				// =========================================================
+
+				document.addEventListener('DOMContentLoaded', function () {
+					initCronModeToggle();
+				});
+				</script>
 				<button type="button" class="button" onclick="const c = document.getElementById('meow-sync-export-code'); c.select(); document.execCommand('copy'); alert('Kode Config Tersalin!');" style="margin-top:8px;">📋 Copy Config Code</button>
 			</div>
 

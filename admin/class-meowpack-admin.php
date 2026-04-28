@@ -40,6 +40,9 @@ class MeowPack_Admin {
 		add_action( 'admin_post_meowpack_reset_content_category', array( $this, 'handle_reset_content_category' ) );
 		// v2.2.0: Settings sync.
 		add_action( 'admin_post_meowpack_import_sync',        array( $this, 'handle_sync_import' ) );
+
+		// AJAX test share.
+		add_action( 'wp_ajax_meowpack_test_share', array( $this, 'handle_test_share' ) );
 	}
 
 	/**
@@ -124,6 +127,7 @@ class MeowPack_Admin {
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
 				'exportUrl' => admin_url( 'admin.php?page=meowpack&meowpack_export=1' ),
 				'exportNonce' => wp_create_nonce( 'meowpack_csv_export' ),
+				'testNonce'   => wp_create_nonce( 'meowpack_test_share' ),
 				'strings' => array(
 					'error'      => __( 'Terjadi kesalahan.', 'meowpack' ),
 				),
@@ -232,7 +236,8 @@ class MeowPack_Admin {
 		$extra_fields = array(
 			'telegram'  => array( 'chat_id', 'message_template' ),
 			'facebook'  => array( 'page_id', 'message_template' ),
-			'twitter'   => array( 'api_key', 'api_secret', 'access_token_key', 'access_secret', 'message_template' ),
+			'instagram' => array( 'ig_user_id', 'message_template' ),
+			'twitter'   => array( 'api_key', 'api_secret', 'access_secret', 'message_template' ),
 			'linkedin'  => array( 'author', 'message_template' ),
 			'bluesky'   => array( 'handle', 'password', 'message_template' ),
 			'threads'   => array( 'user_id', 'message_template' ),
@@ -795,6 +800,44 @@ class MeowPack_Admin {
 
 		wp_safe_redirect( add_query_arg( array( 'page' => 'meowpack-content-moderation', 'tab' => 'dictionary', 'category' => $category, 'saved' => '1' ), admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	/**
+	 * Handle AJAX request to test a social media connection.
+	 */
+	public function handle_test_share() {
+		check_ajax_referer( 'meowpack_test_share', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorized' ) );
+		}
+
+		$platform = sanitize_key( $_POST['platform'] ?? '' );
+		if ( ! in_array( $platform, MeowPack_AutoShare::$platforms, true ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid platform' ) );
+		}
+
+		$vars = array(
+			'{id}'             => 0,
+			'{title}'          => 'Test Post from MeowPack',
+			'{url}'            => home_url(),
+			'{excerpt}'        => 'Ini adalah pesan tes untuk memastikan koneksi Auto Share Anda sudah benar.',
+			'{tags}'           => '#MeowPack #Test',
+			'{sitename}'       => get_bloginfo( 'name' ),
+			'{featured_image}' => 'https://via.placeholder.com/800x600.png?text=MeowPack+Test',
+		);
+
+		// Use the correct class for testing.
+		$autoshare = new MeowPack_AutoShare();
+		$result = $autoshare->test_connection( $platform, $vars );
+
+		if ( $result['success'] ) {
+			wp_send_json_success( array( 'message' => 'Pesan tes berhasil dikirim ke ' . ucfirst( $platform ) . '!' ) );
+		} else {
+			wp_send_json_error( array( 
+				'message' => 'Gagal mengirim pesan tes ke ' . ucfirst( $platform ) . '.',
+				'code'    => $result['code'] ?? 'Unknown Error'
+			) );
+		}
 	}
 
 	/** Import CSV. */

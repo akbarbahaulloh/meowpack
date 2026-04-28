@@ -461,3 +461,98 @@ class MeowPack_Recent_Widget extends WP_Widget {
 		return $instance;
 	}
 }
+
+/**
+ * MeowPack Related Posts Widget.
+ */
+class MeowPack_Related_Widget extends WP_Widget {
+
+	public function __construct() {
+		parent::__construct(
+			'meowpack_related_widget',
+			__( '🐱 MeowPack: Related Posts', 'meowpack' ),
+			array( 'description' => __( 'Tampilkan artikel terkait berdasarkan kategori (hanya tampil di halaman artikel tunggal).', 'meowpack' ) )
+		);
+	}
+
+	public function widget( $args, $instance ) {
+		if ( ! is_single() ) {
+			return; // Only show on single post pages
+		}
+
+		global $post;
+
+		$title = ! empty( $instance['title'] ) ? $instance['title'] : __( 'Artikel Terkait', 'meowpack' );
+		$count = ! empty( $instance['count'] ) ? absint( $instance['count'] ) : 5;
+
+		echo wp_kses_post( $args['before_widget'] );
+		if ( $title ) {
+			echo wp_kses_post( $args['before_title'] . esc_html( $title ) . $args['after_title'] );
+		}
+
+		$categories = get_the_category( $post->ID );
+		$category_ids = array();
+		if ( $categories ) {
+			foreach ( $categories as $category ) {
+				$category_ids[] = $category->term_id;
+			}
+		}
+
+		$q_args = array(
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'posts_per_page' => $count,
+			'ignore_sticky_posts' => 1,
+			'post__not_in'   => array( $post->ID ),
+		);
+
+		if ( ! empty( $category_ids ) ) {
+			$q_args['category__in'] = $category_ids;
+		}
+
+		$query = new WP_Query( $q_args );
+
+		if ( $query->have_posts() ) {
+			wp_enqueue_style( 'meowpack-public', MEOWPACK_URL . 'public/assets/meowpack-public.css', array(), MEOWPACK_VERSION );
+			echo '<ul class="meowpack-post-list">';
+			while ( $query->have_posts() ) {
+				$query->the_post();
+				echo '<li class="meowpack-post-list__item">';
+				echo '<a href="' . esc_url( get_permalink() ) . '" class="meowpack-post-list__link">';
+				echo '<span class="meowpack-post-list__bullet">•</span>';
+				echo '<span class="meowpack-post-list__title">' . get_the_title() . '</span>';
+				echo '</a>';
+				echo '</li>';
+			}
+			echo '</ul>';
+			wp_reset_postdata();
+		} else {
+			echo '<p>' . esc_html__( 'Belum ada artikel terkait.', 'meowpack' ) . '</p>';
+		}
+
+		echo wp_kses_post( $args['after_widget'] );
+	}
+
+	public function form( $instance ) {
+		$title = ! empty( $instance['title'] ) ? $instance['title'] : __( 'Artikel Terkait', 'meowpack' );
+		$count = ! empty( $instance['count'] ) ? $instance['count'] : 5;
+		?>
+		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php esc_html_e( 'Judul:', 'meowpack' ); ?></label>
+			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" type="text" value="<?php echo esc_attr( $title ); ?>">
+		</p>
+		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'count' ) ); ?>"><?php esc_html_e( 'Jumlah ditampilkan:', 'meowpack' ); ?></label>
+			<input class="tiny-text" id="<?php echo esc_attr( $this->get_field_id( 'count' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'count' ) ); ?>" type="number" step="1" min="1" max="20" value="<?php echo esc_attr( $count ); ?>" size="3">
+		</p>
+		<p><em><?php esc_html_e( 'Catatan: Widget ini hanya akan muncul di halaman artikel tunggal.', 'meowpack' ); ?></em></p>
+		<?php
+	}
+
+	public function update( $new_instance, $old_instance ) {
+		$instance = array();
+		$instance['title'] = ( ! empty( $new_instance['title'] ) ) ? sanitize_text_field( $new_instance['title'] ) : '';
+		$instance['count'] = ( ! empty( $new_instance['count'] ) ) ? absint( $new_instance['count'] ) : 5;
+		return $instance;
+	}
+}

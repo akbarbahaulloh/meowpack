@@ -368,6 +368,8 @@ class MeowPack_Database {
 			'show_share_buttons_on'     => 'post,page',
 			'show_toc'                  => 'auto',
 			'enable_related_posts'      => '1',
+			'cron_mode'                 => 'wp-cron',
+			'cron_secret_token'         => wp_generate_password( 32, false ),
 		);
 
 		foreach ( $defaults as $key => $value ) {

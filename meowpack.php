@@ -136,6 +136,7 @@ function meowpack_init() {
 		register_widget( 'MeowPack_Popular_Widget' );
 		register_widget( 'MeowPack_Random_Widget' );
 		register_widget( 'MeowPack_Recent_Widget' );
+		register_widget( 'MeowPack_Related_Widget' );
 	} );
 }
 add_action( 'plugins_loaded', 'meowpack_init' );

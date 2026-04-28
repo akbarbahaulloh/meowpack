@@ -208,6 +208,20 @@ class MeowPack_Core {
 			)
 		);
 
+		// --- Manual Cron trigger ----------------------------------------------
+		register_rest_route(
+			'meowpack/v1',
+			'/cron',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_manual_cron' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'token' => array( 'type' => 'string', 'required' => true ),
+				),
+			)
+		);
+
 		// --- Reactions API -----------------------------------------------------
 		if ( class_exists( 'MeowPack_Reactions' ) ) {
 			MeowPack_Reactions::register_routes( $this );
@@ -220,14 +234,46 @@ class MeowPack_Core {
 	 *  2. Delete raw visits older than retention period.
 	 *  3. Retry failed share logs.
 	 *  4. Aggregate bot stats.
+	 *
+	 * @param bool $force Whether to force execution regardless of cron_mode setting.
 	 */
-	public function run_daily_cron() {
+	public function run_daily_cron( $force = false ) {
+		if ( ! $force && 'manual' === MeowPack_Database::get_setting( 'cron_mode' ) ) {
+			return;
+		}
+
 		$this->stats->aggregate_yesterday();
 
 		$retention = (int) MeowPack_Database::get_setting( 'data_retention_days', 30 );
 		$this->stats->purge_old_visits( $retention );
 
 		$this->autoshare->retry_failed_shares();
+
+		// Record last run time.
+		MeowPack_Database::update_setting( 'last_cron_run', current_time( 'mysql' ) );
+	}
+
+	/**
+	 * Handle manual cron trigger via REST API.
+	 *
+	 * @param WP_REST_Request $request REST request object.
+	 * @return array|WP_Error
+	 */
+	public function handle_manual_cron( $request ) {
+		$token = $request->get_param( 'token' );
+		$saved_token = MeowPack_Database::get_setting( 'cron_secret_token' );
+
+		if ( empty( $saved_token ) || $token !== $saved_token ) {
+			return new WP_Error( 'forbidden', 'Invalid cron token.', array( 'status' => 403 ) );
+		}
+
+		$this->run_daily_cron( true );
+
+		return array(
+			'success' => true,
+			'message' => 'MeowPack daily tasks executed.',
+			'time'    => current_time( 'mysql' ),
+		);
 	}
 
 	/**
