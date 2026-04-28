@@ -244,7 +244,7 @@ ul.meowpack-post-list {
 ul.meowpack-post-list li.meowpack-post-list__item {
 	list-style-type: none !important;
 	padding: 0 !important;
-	margin: 0 0 12px 0 !important;
+	margin: 0 0 8px 0 !important;
 	background: none !important;
 	border: none !important;
 }
@@ -261,7 +261,7 @@ ul.meowpack-post-list li.meowpack-post-list__item::before {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: 12px 16px;
+	padding: 8px 14px;
 	background: var(--mp-bg-glass);
 	border: 1px solid var(--mp-border-glass);
 	border-radius: 12px;
