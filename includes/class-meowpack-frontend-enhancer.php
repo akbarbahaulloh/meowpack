@@ -194,7 +194,7 @@ class MeowPack_Frontend_Enhancer {
 		$args = array(
 			'category__in'   => $cat_ids,
 			'post__not_in'   => array( $post_id ),
-			'posts_per_page' => 3,
+			'posts_per_page' => 5,
 			'ignore_sticky_posts' => 1,
 			'no_found_rows'  => true,
 		);
@@ -205,21 +205,22 @@ class MeowPack_Frontend_Enhancer {
 			return '';
 		}
 
-		$html = '<div class="meowpack-related-posts" style="margin-top:40px; padding-top:20px; border-top:2px solid #f1f3f5;">';
-		$html .= '<h3 style="margin-bottom:20px;">🔗 ' . esc_html__( 'Tulisan Terkait', 'meowpack' ) . '</h3>';
-		$html .= '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">';
+		$html = '<div class="meowpack-related-posts" style="margin-top:40px; padding-top:20px; border-top:1px solid #eee; clear:both;">';
+		$html .= '<h3 style="margin:0 0 20px 0; padding:0; font-size:1.5rem; font-weight:bold; color:#333;">' . esc_html__( 'Tulisan Terkait', 'meowpack' ) . '</h3>';
+		$html .= '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:15px; margin:0; padding:0;">';
 
 		while ( $query->have_posts() ) {
 			$query->the_post();
 			
 			$thumb = has_post_thumbnail() ? get_the_post_thumbnail_url( get_the_ID(), 'medium' ) : '';
-			$bg = $thumb ? "background-image:url('$thumb');" : "background:#e9ecef;";
 
-			$html .= '<a href="' . get_permalink() . '" style="display:block; text-decoration:none; color:inherit; border-radius:8px; overflow:hidden; box-shadow:0 4px 6px rgba(0,0,0,0.05); transition:transform 0.2s;">';
-			$html .= '<div style="height:120px; background-size:cover; background-position:center; ' . $bg . '"></div>';
-			$html .= '<div style="padding:12px 16px;">';
-			$html .= '<h4 style="margin:0; font-size:1em; line-height:1.4;">' . get_the_title() . '</h4>';
-			$html .= '<div style="font-size:0.8em; color:#6c757d; margin-top:8px;">' . get_the_date() . '</div>';
+			$html .= '<a href="' . get_permalink() . '" style="display:flex; flex-direction:column; text-decoration:none; color:inherit; border-radius:10px; overflow:hidden; border:1px solid #edf2f7; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.04); transition:all 0.2s; height:100%;">';
+			if ( $thumb ) {
+				$html .= '<div style="height:150px; background-size:cover; background-position:center; background-image:url(\'' . esc_url( $thumb ) . '\');"></div>';
+			}
+			$html .= '<div style="padding:15px; flex-grow:1; display:flex; flex-direction:column; justify-content:center;">';
+			$html .= '<h4 style="margin:0; font-size:1.05rem; line-height:1.5; color:#2d3748; font-weight:600;">' . get_the_title() . '</h4>';
+			$html .= '<div style="font-size:0.85rem; color:#718096; margin-top:8px;">' . get_the_date() . '</div>';
 			$html .= '</div>';
 			$html .= '</a>';
 		}
