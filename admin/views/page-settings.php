@@ -42,6 +42,10 @@ $s = function( $key, $default = '' ) {
 					<td><label><input type="checkbox" name="enable_share_buttons" value="1" <?php checked( '1', $s( 'enable_share_buttons', '1' ) ); ?>> <?php esc_html_e( 'Tampilkan tombol share di artikel', 'meowpack' ); ?></label></td>
 				</tr>
 				<tr>
+					<th><?php esc_html_e( 'Reading Time', 'meowpack' ); ?></th>
+					<td><label><input type="checkbox" name="enable_reading_time" value="1" <?php checked( '1', $s( 'enable_reading_time', '1' ) ); ?>> <?php esc_html_e( 'Tampilkan estimasi waktu baca di artikel', 'meowpack' ); ?></label></td>
+				</tr>
+				<tr>
 					<th><?php esc_html_e( 'Auto Share', 'meowpack' ); ?></th>
 					<td><label><input type="checkbox" name="enable_autoshare" value="1" <?php checked( '1', $s( 'enable_autoshare', '0' ) ); ?>> <?php esc_html_e( 'Share otomatis saat post dipublish', 'meowpack' ); ?></label></td>
 				</tr>

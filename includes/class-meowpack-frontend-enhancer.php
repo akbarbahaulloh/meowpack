@@ -79,8 +79,8 @@ class MeowPack_Frontend_Enhancer {
 		$views_allowed = explode( ',', MeowPack_Database::get_setting( 'show_views_on', 'post,page' ) );
 		$read_allowed  = explode( ',', MeowPack_Database::get_setting( 'show_reading_time_on', 'post,page' ) );
 
-		$show_views = in_array( $post_type, $views_allowed, true );
-		$show_read  = in_array( $post_type, $read_allowed, true );
+		$show_views = in_array( $post_type, $views_allowed, true ) && '1' === MeowPack_Database::get_setting( 'enable_view_counter', '1' );
+		$show_read  = in_array( $post_type, $read_allowed, true ) && '1' === MeowPack_Database::get_setting( 'enable_reading_time', '1' );
 
 		if ( ! $show_views && ! $show_read ) {
 			return '';

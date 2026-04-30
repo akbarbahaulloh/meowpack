@@ -160,6 +160,7 @@ class MeowPack_Admin {
 			'enable_view_counter'   => 'absint',
 			'enable_share_buttons'  => 'absint',
 			'enable_autoshare'      => 'absint',
+			'enable_reading_time'   => 'absint',
 			'enable_widget'         => 'absint',
 			'share_button_position' => 'sanitize_text_field',
 			'share_button_style'    => 'sanitize_text_field',
